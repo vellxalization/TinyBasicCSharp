@@ -18,10 +18,9 @@ public class TBToken
 public enum TBTokenType
 {
     Unknown,
-    Keyword,
+    String,
     Operator,
     Parenthesis,
-    Variable,
     Number,
-    String,
+    QuotedString,
 }
