@@ -17,6 +17,8 @@ public class Lexer
             { ++_pointer; }
             else if (current is '"')
             { tokens.Add(ReadQuotedString()); }
+            else if (current is ',')
+            { tokens.Add(ReadComma()); }
             else if (current is '(' or ')' or '+' or '-' or '*' or '/' or '<' or '>' or '=')
             { tokens.Add(ReadOperatorOrParenthesis()); }
             else if (char.IsDigit(current))
@@ -29,6 +31,13 @@ public class Lexer
         return tokens.ToArray();
     }
 
+    private TBToken ReadComma()
+    {
+        TBToken token = new TBToken(){ Type = TBTokenType.Separator, Value = ","};
+        ++_pointer;
+        return token;
+    }
+    
     private TBToken ReadNumber()
     {
         int pointerCopy = _pointer;
