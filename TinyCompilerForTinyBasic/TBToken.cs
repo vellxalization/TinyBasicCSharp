@@ -18,6 +18,7 @@ public class TBToken
 public enum TBTokenType
 {
     Unknown,
+    NewLine,
     Separator,
     String,
     Operator,

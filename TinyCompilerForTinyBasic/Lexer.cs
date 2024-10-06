@@ -1,4 +1,6 @@
-﻿namespace TinyCompilerForTinyBasic;
+﻿using System.Text;
+
+namespace TinyCompilerForTinyBasic;
 
 public class Lexer
 {
@@ -13,7 +15,9 @@ public class Lexer
         {
             char current = _sourceCode[_pointer];
             
-            if (char.IsWhiteSpace(current))
+            if (current is '\n')
+            { tokens.Add(ReadNewLine()); }
+            else if (char.IsWhiteSpace(current))
             { ++_pointer; }
             else if (current is '"')
             { tokens.Add(ReadQuotedString()); }
@@ -38,19 +42,26 @@ public class Lexer
         return token;
     }
     
+    private TBToken ReadNewLine()
+    {
+        TBToken token = new TBToken(){ Type = TBTokenType.NewLine, Value = "\n"};
+        ++_pointer;
+        return token;
+    }
+    
     private TBToken ReadNumber()
     {
-        int pointerCopy = _pointer;
+        StringBuilder builder = new(_sourceCode[_pointer].ToString());
         char next = Peek();
-        while (char.IsDigit(next) || char.IsWhiteSpace(next))
+        while (char.IsDigit(next) || next is ' ')
         {
+            if (next != ' ')
+            { builder.Append(next); }
             ++_pointer;
             next = Peek();
-        } 
+        }
         
-        ++_pointer;
-        string value = _sourceCode.Substring(pointerCopy, _pointer - pointerCopy).Trim();
-        return new TBToken(TBTokenType.Number, value);
+        return new TBToken(){ Type = TBTokenType.Number, Value = builder.ToString() };
     }
 
     private TBToken ReadQuotedString()
@@ -108,7 +119,7 @@ public class Lexer
             case '<':
             case '>':
                 char next = Peek();
-                if (next == '=' || ((current == '<' && next == '>') || (current == '>' && next == '<')))
+                if ((next == '=') || ((current == '<' && next == '>') || (current == '>' && next == '<')))
                 {
                     token = new TBToken(TBTokenType.Operator, string.Concat(current, next));
                     _pointer += 2;
