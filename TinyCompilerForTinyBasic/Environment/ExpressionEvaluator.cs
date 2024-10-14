@@ -5,15 +5,15 @@ public class ExpressionEvaluator
     private EnvironmentMemory _memory;
     public ExpressionEvaluator(EnvironmentMemory memory) => _memory = memory;
 
-    public short EvaluateExpression(Span<TinyBasicToken> expression)
+    public short EvaluateExpression(TinyBasicToken[] expression)
     {
         int start = 0;
-        int value = EvaluateExpression(expression, ref start);
-        
-        return unchecked((short)value);
+        short value = EvaluateExpression(expression, ref start);
+
+        return value;
     }
 
-    private short EvaluateExpression(Span<TinyBasicToken> expression, ref int start)
+    private short EvaluateExpression(TinyBasicToken[] expression, ref int start)
     {
         TinyBasicToken token = expression[start];
         bool shouldNegate = false;
@@ -39,7 +39,7 @@ public class ExpressionEvaluator
         return unchecked((short)value);
     }
     
-    private int EvaluateTerm(Span<TinyBasicToken> expression, ref int start)
+    private int EvaluateTerm(TinyBasicToken[] expression, ref int start)
     {
         int value = EvaluateFactor(expression, ref start);
 
@@ -64,30 +64,31 @@ public class ExpressionEvaluator
         return value;
     }
 
-    private int EvaluateFactor(Span<TinyBasicToken> expression, ref int start)
+    private int EvaluateFactor(TinyBasicToken[] expression, ref int start)
     {
         TinyBasicToken token = expression[start];
         switch (token.Type)
         {
             case TBTokenType.Number:
-            { return int.Parse(LineToStringUtility.TokenToString(token)); }
+            { return int.Parse(token.ToString()); }
             case TBTokenType.String:
             {
-                char address = char.Parse(LineToStringUtility.TokenToString(token));
+                char address = char.Parse(token.ToString());
                 short? value = _memory.ReadVariable(address);
                 if (value is null)
                 { throw new RuntimeException("Tried to read an uninitialized variable."); }
 
                 return value.Value;
             }
-            default:
+            case TBTokenType.ParenthesisOpen:
             {
-                // parenthesis
                 ++start;
                 short value = EvaluateExpression(expression, ref start);
                 ++start;
                 return value;
             }
+            default:
+            { throw new RuntimeException("Unexpected token in expression"); }
         }
     }
 }

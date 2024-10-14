@@ -8,7 +8,7 @@ public class Lexer
     private string _sourceCode;
     private int _pointer = 0;
 
-    public List<TinyBasicToken> Tokenize()
+    public TinyBasicToken[] Tokenize()
     {
         var tokens = new List<TinyBasicToken>();
         
@@ -47,10 +47,10 @@ public class Lexer
             { throw new TokenizationException($"Unexpected character '{current}'"); }
         }
 
-        return tokens;
+        return tokens.ToArray();
     }
 
-    private ValueTinyBasicTinyBasicToken ReadQuotedString()
+    private ValueTinyBasicToken ReadQuotedString()
     {
         int pointerCopy = _pointer;
 
@@ -66,10 +66,10 @@ public class Lexer
         if ((_pointer >= _sourceCode.Length) || (currentChar is '\n' or '\r'))
         { throw new TokenizationException($"Failed to find closing quotation mark for: {_sourceCode.Substring(pointerCopy, _pointer - pointerCopy)}"); }
         
-        return new ValueTinyBasicTinyBasicToken(TBTokenType.QuotedString, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
+        return new ValueTinyBasicToken(TBTokenType.QuotedString, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
     }
 
-    private ValueTinyBasicTinyBasicToken ReadNumber()
+    private ValueTinyBasicToken ReadNumber()
     {
         var builder = new StringBuilder();
         
@@ -93,10 +93,10 @@ public class Lexer
             // break from the loop if we've encountered a non-digit OR reached the end of source code
         }
         
-        return new ValueTinyBasicTinyBasicToken(TBTokenType.Number, builder.ToString());
+        return new ValueTinyBasicToken(TBTokenType.Number, builder.ToString());
     }
 
-    private ValueTinyBasicTinyBasicToken ReadString()
+    private ValueTinyBasicToken ReadString()
     {
         int pointerCopy = _pointer;
         
@@ -109,7 +109,7 @@ public class Lexer
             ++_pointer;
         }
         
-        return new ValueTinyBasicTinyBasicToken(TBTokenType.String, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
+        return new ValueTinyBasicToken(TBTokenType.String, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
     }
 
     private TinyBasicToken ReadOperatorOrParenthesis()
