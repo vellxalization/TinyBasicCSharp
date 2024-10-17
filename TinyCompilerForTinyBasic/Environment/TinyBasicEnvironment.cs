@@ -4,7 +4,7 @@ using TinyCompilerForTinyBasic.Parsing;
 
 namespace TinyCompilerForTinyBasic;
 
-public class TBEnvironment
+public class TinyBasicEnvironment
 {
     private List<TinyBasicToken[]> _program = [];
     private EnvironmentMemory _memory = new();
@@ -15,7 +15,7 @@ public class TBEnvironment
     private Queue<short> _inputQueue = new();
     private Queue<int> _returnQueue = new();
 
-    public TBEnvironment()
+    public TinyBasicEnvironment()
     {
         _evaluator = new ExpressionEvaluator(_memory);
     }
@@ -121,7 +121,7 @@ public class TBEnvironment
                 {
                     foreach (TinyBasicToken token in programLine)
                     {
-                        builder.Append(token.ToString());
+                        builder.Append(token);
                         builder.Append(' ');
                     }
                     Console.WriteLine(builder.ToString());
