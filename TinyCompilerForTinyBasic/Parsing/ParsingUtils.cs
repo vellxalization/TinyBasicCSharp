@@ -6,13 +6,15 @@ public static class ParsingUtils
     {
         int pointerCopy = start;
 
-        while (((start + 1) < line.Length) && (line[start + 1].Type is TBTokenType.ParenthesisClose
-                   or TBTokenType.ParenthesisOpen or
-                   TBTokenType.OperatorPlus or TBTokenType.OperatorMinus or
-                   TBTokenType.OperatorDivision or TBTokenType.OperatorMultiplication or
-                   TBTokenType.Number or TBTokenType.String))
+        while ((start + 1) < line.Length)
         {
             TinyBasicToken token = line[start + 1];
+            if (token.Type is not (TBTokenType.ParenthesisClose or TBTokenType.ParenthesisOpen or
+                TBTokenType.OperatorPlus or TBTokenType.OperatorMinus or
+                TBTokenType.OperatorDivision or TBTokenType.OperatorMultiplication or
+                TBTokenType.Number or TBTokenType.String))
+            { break; }
+                
             if (token.Type is TBTokenType.String)
             {
                 if (!char.TryParse(token.ToString(), out _))
@@ -53,7 +55,7 @@ public static class ParsingUtils
             // continue parsing term only if next operator is + or -
             start += 2;
             if (start >= expression.Length)
-            { throw new ParsingException($"Expected a term after: {token} operator"); }
+            { throw new ParsingException($"Expected a term after {token} operator"); }
             
             ParseTerm(expression, ref start);
         }
@@ -72,7 +74,7 @@ public static class ParsingUtils
             // continue parsing term only if next operator is * or /
             start += 2;
             if (start >= expression.Length)
-            { throw new ParsingException($"Expected a term after: {token} operator"); }
+            { throw new ParsingException($"Expected a term after {token} operator"); }
             
             ParseFactor(expression, ref start);
         }

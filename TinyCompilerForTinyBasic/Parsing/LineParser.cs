@@ -38,7 +38,10 @@ public class LineParser
         ParseStatement(line);
         TinyBasicToken? next = Peek();
         if (next is null)
-        { return line.ToArray()!; }
+        {
+            ++_pointer;
+            return line.ToArray()!;
+        }
         if (next.Type is TBTokenType.NewLine)
         {
             _pointer += 2;
@@ -63,7 +66,6 @@ public class LineParser
     {
         TinyBasicToken token = _tokens[_pointer];
         lineToModify.Add(token);
-        ++_pointer;
         
         string value = token.ToString();
         switch (value)
@@ -73,14 +75,16 @@ public class LineParser
                 if (Peek() is null)
                 { throw new ParsingException($"Expected a list of expressions after PRINT keyword: {LineToString(lineToModify)}"); }
                 
-                ParseExprList(lineToModify!);
+                ++_pointer;
+                ParseExprList(lineToModify);
                 break;
             }
             case "IF":
                 if (Peek() is null)
                 { throw new ParsingException($"Expected an expression after IF keyword: {LineToString(lineToModify)}"); }
                 
-                ParseIf(lineToModify!);
+                ++_pointer;
+                ParseIf(lineToModify);
                 break;
             case "GOSUB":
             case "GOTO":
@@ -88,6 +92,7 @@ public class LineParser
                 if (Peek() is null)
                 { throw new ParsingException($"Expected an expression after {value} keyword: {LineToString(lineToModify)}"); }
 
+                ++_pointer;
                 ExpressionTinyBasicToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
                 try
                 { ParsingUtils.ParseExpression(expression); }
@@ -101,7 +106,8 @@ public class LineParser
                 if (Peek() is null)
                 { throw new ParsingException($"Expected a list of variables after INPUT keyword: {LineToString(lineToModify)}"); }
 
-                ParseVarList(lineToModify!);
+                ++_pointer;
+                ParseVarList(lineToModify);
                 return;
             }
             case "LET":
@@ -109,6 +115,7 @@ public class LineParser
                 if (Peek() is null)
                 { throw new ParsingException($"Expected a variable name after LET keyword: {LineToString(lineToModify)}"); }
 
+                ++_pointer;
                 ParseLet(lineToModify);
                 return;
             }
@@ -253,22 +260,6 @@ public class LineParser
         { throw new ParsingException($"Failed to parse expression: {ex.Message} @ {LineToString(lineToModify)}"); }
         lineToModify.Add(expression);
     }
-
-    // private ExpressionTinyBasicToken SelectExpression()
-    // {
-    //     int pointerCopy = _pointer;
-    //     
-    //     TinyBasicToken? next = Peek();
-    //     while (next?.Type is TBTokenType.ParenthesisClose or TBTokenType.ParenthesisOpen or
-    //            TBTokenType.OperatorPlus or TBTokenType.OperatorMinus or
-    //            TBTokenType.OperatorDivision or TBTokenType.OperatorMultiplication or
-    //            TBTokenType.Number or TBTokenType.String)
-    //     {
-    //         ++_pointer;
-    //         next = Peek();
-    //     }
-    //     return new ExpressionTinyBasicToken(_tokens[pointerCopy..(_pointer + 1)]);
-    // }
     
     private string LineToString(IEnumerable<TinyBasicToken?> line)
     {

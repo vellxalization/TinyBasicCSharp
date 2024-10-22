@@ -1,62 +1,74 @@
 ﻿using System.Text;
-using TinyCompilerForTinyBasic.Environment;
 using TinyCompilerForTinyBasic.Parsing;
 
-namespace TinyCompilerForTinyBasic;
+namespace TinyCompilerForTinyBasic.Environment;
 
 public class TinyBasicEnvironment
 {
-    private List<TinyBasicToken[]> _program = [];
+    public ConsoleCancelEventHandler CancelHandler { get; }
+    
+    private SortedList<int, (TinyBasicToken[] line, bool isLabeled)> _program = new();
     private EnvironmentMemory _memory = new();
-    private Dictionary<int, int> _labelsMap = new();
     private ExpressionEvaluator _evaluator;
-    private int _linePointer = 0;
+    private bool _isRunning = false;
+    private int _lineKeyIndex = 0;
     
     private Queue<short> _inputQueue = new();
     private Queue<int> _returnQueue = new();
-
+    
     public TinyBasicEnvironment()
     {
+        CancelHandler = (_, args) =>
+        {
+            args.Cancel = true;
+            if (!_isRunning)
+            { return; }
+            
+            Console.WriteLine("Execution terminated");
+            _isRunning = false;
+        };
         _evaluator = new ExpressionEvaluator(_memory);
     }
     
-    public void ExecuteLoadedCode()
+    public void ExecuteFile(string sourceCode)
     {
-        while (_linePointer < _program.Count)
-        {
-            ExecuteLine(_program[_linePointer]);
-            ++_linePointer;
-        }
-    }
-
-    public void LoadCode(string sourceCode)
-    {
-        Lexer lexer = new Lexer(sourceCode);
-        AddToStack(lexer.Tokenize());
-    }
-
-    private void AddToStack(TinyBasicToken[] tokens)
-    {
-        LineParser parser = new LineParser(tokens);
+        var lexer = new Lexer(sourceCode);
+        var parser = new LineParser(lexer.Tokenize());
+    
+        int lastPointer = 0;
         while (parser.CanReadLine())
         {
             TinyBasicToken[] line = parser.ParseLine();
-            if (line[0].Type is TBTokenType.NewLine)
-            { continue; }
-            
             if (line[0].Type is TBTokenType.Number)
-            { UpdateLabel(int.Parse(line[0].ToString()), line); }
-            _program.Add(line);
+            { AddToProgram(line, int.Parse(line[0].ToString()), true); }
+            else
+            { AddToProgram(line, ++lastPointer, false); }
         }
+        ExecuteProgram();
+    }
+    
+    public void ExecuteDirectly(string line)
+    {
+        var lexer = new Lexer(line);
+        LineParser parser = new(lexer.Tokenize());
+        TinyBasicToken[] parsedLine = parser.ParseLine();
+        
+        if (parsedLine[0].Type is TBTokenType.Number)
+        { AddToProgram(parsedLine, int.Parse(parsedLine[0].ToString()), true); }
+        else
+        { ExecuteLine(parsedLine); }
     }
 
-    // TODO: double check this later
-    private void UpdateLabel(int label, TinyBasicToken[] line)
+    private void AddToProgram(TinyBasicToken[] line, int position, bool isLabeled)
     {
-        if ((line.Length < 2) || (line[1].Type is TBTokenType.NewLine))
-        { _labelsMap.Remove(label); }
-        else
-        { _labelsMap.Add(label, _program.Count); }
+        if (!isLabeled && (line.Length < 2 || line[1].Type is TBTokenType.NewLine))
+        {
+            _program.Remove(position);
+            return;
+        }
+        
+        if (!_program.TryAdd(position, (line, isLabeled)))
+        { _program[position] = (line, isLabeled); }
     }
     
     private void ExecuteLine(TinyBasicToken[] line)
@@ -105,39 +117,25 @@ public class TinyBasicEnvironment
                 if (!_returnQueue.TryDequeue(out int lineNumber))
                 { throw new RuntimeException("Tried to return without invoking a subroutine"); }
                 
-                _linePointer = lineNumber;
+                _lineKeyIndex = lineNumber;
                 break;
             }
             case "END":
             {
-                System.Environment.Exit(0);
+                _isRunning = false;
                 break;
             }
             case "LIST":
             {
-                var builder = new StringBuilder();
-                
-                foreach (TinyBasicToken[] programLine in _program)
-                {
-                    foreach (TinyBasicToken token in programLine)
-                    {
-                        builder.Append(token);
-                        builder.Append(' ');
-                    }
-                    Console.WriteLine(builder.ToString());
-                    builder.Clear();
-                }
+                PrintProgram();
                 break;
             }
             case "CLEAR":
             {
                 _inputQueue.Clear();
                 _returnQueue.Clear();
-                _program = [];
-                _memory = new EnvironmentMemory();
-                _evaluator = new(_memory);
-                _linePointer = 0;
-                _labelsMap.Clear();
+                _lineKeyIndex = 0;
+                _program.Clear();
                 break;
             }
             case "IF":
@@ -154,6 +152,43 @@ public class TinyBasicEnvironment
                 
                 break;
             }
+            case "RUN":
+            {
+                ExecuteProgram();
+                break;
+            }
+        }
+    }
+
+    private void ExecuteProgram()
+    {
+        _lineKeyIndex = 0;
+        IList<int> keys = _program.Keys;
+
+        _isRunning = true;
+        while (_isRunning && _lineKeyIndex < keys.Count)
+        {
+            int key = keys[_lineKeyIndex];
+            TinyBasicToken[] line = _program[key].line;
+            ExecuteLine(line);
+            ++_lineKeyIndex;
+        }
+        _isRunning = false;
+    }
+    
+    private void PrintProgram()
+    {
+        var builder = new StringBuilder();
+
+        foreach (var (line, _) in _program.Values)
+        {
+            foreach (TinyBasicToken token in line)
+            {
+                builder.Append(token);
+                builder.Append(' ');
+            }
+            Console.WriteLine(builder.ToString());
+            builder.Clear();
         }
     }
 
@@ -161,12 +196,13 @@ public class TinyBasicEnvironment
     {
         var expression = (ExpressionTinyBasicToken)line[start];
         short label = _evaluator.EvaluateExpression(expression.Components);
-        if (!_labelsMap.TryGetValue(label, out int lineNumber))
-        { throw new Exception("Label does not exist"); }
+        if ((!_program.TryGetValue(label, out var instruction)) || (!instruction.isLabeled))
+        { throw new Exception($"Label {label} does not exist"); }
 
         if (isSubroutine)
-        { _returnQueue.Enqueue(_linePointer); }
-        _linePointer = (lineNumber - 1);
+        { _returnQueue.Enqueue(_lineKeyIndex); }
+        
+        _lineKeyIndex = (_program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
     }
     
     private void LoadAddressesWithValues(List<char> addresses)
@@ -178,15 +214,14 @@ public class TinyBasicEnvironment
             {
                 _memory.WriteVariable(value, addresses[pointer]);
                 ++pointer;
+                continue;
             }
-            else
+
+            List<ExpressionTinyBasicToken> input = RequestInput();
+            foreach (ExpressionTinyBasicToken expression in input)
             {
-                List<ExpressionTinyBasicToken> input = RequestInput();
-                foreach (ExpressionTinyBasicToken expression in input)
-                {
-                    value = _evaluator.EvaluateExpression(expression.Components);
-                    _inputQueue.Enqueue(value);
-                }
+                value = _evaluator.EvaluateExpression(expression.Components);
+                _inputQueue.Enqueue(value);
             }
         }
     }
