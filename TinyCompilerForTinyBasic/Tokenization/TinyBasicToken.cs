@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace TinyCompilerForTinyBasic;
+namespace TinyCompilerForTinyBasic.Tokenization;
 
 public class TinyBasicToken
 {
@@ -80,6 +80,7 @@ public class ExpressionTinyBasicToken : TinyBasicToken
             { builder.Append(' '); }
         }
         
+        builder.Remove(builder.Length - 1, 1);
         return builder.ToString();
     }
 }

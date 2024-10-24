@@ -1,4 +1,6 @@
-﻿namespace TinyCompilerForTinyBasic.Environment;
+﻿using TinyCompilerForTinyBasic.Tokenization;
+
+namespace TinyCompilerForTinyBasic.Environment;
 
 public class ExpressionEvaluator
 {
@@ -63,7 +65,7 @@ public class ExpressionEvaluator
         }
         return value;
     }
-
+    
     private int EvaluateFactor(TinyBasicToken[] expression, ref int start)
     {
         TinyBasicToken token = expression[start];
@@ -76,7 +78,7 @@ public class ExpressionEvaluator
                 char address = char.Parse(token.ToString());
                 short? value = _memory.ReadVariable(address);
                 if (value is null)
-                { throw new RuntimeException("Tried to read an uninitialized variable."); }
+                { throw new RuntimeException($"Tried to read an uninitialized variable \"{address}\""); }
 
                 return value.Value;
             }
@@ -88,7 +90,7 @@ public class ExpressionEvaluator
                 return value;
             }
             default:
-            { throw new RuntimeException("Unexpected token in expression"); }
+            { throw new RuntimeException($"Unexpected token (\"{token}\") in expression"); }
         }
     }
 }

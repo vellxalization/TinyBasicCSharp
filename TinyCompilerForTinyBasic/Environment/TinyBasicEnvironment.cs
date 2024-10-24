@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using TinyCompilerForTinyBasic.Parsing;
+using TinyCompilerForTinyBasic.Tokenization;
 
 namespace TinyCompilerForTinyBasic.Environment;
 
@@ -20,10 +21,10 @@ public class TinyBasicEnvironment
     {
         CancelHandler = (_, args) =>
         {
-            args.Cancel = true;
             if (!_isRunning)
             { return; }
             
+            args.Cancel = true;
             Console.WriteLine("Execution terminated");
             _isRunning = false;
         };
@@ -32,36 +33,76 @@ public class TinyBasicEnvironment
     
     public void ExecuteFile(string sourceCode)
     {
+        Clear();
         var lexer = new Lexer(sourceCode);
-        var parser = new LineParser(lexer.Tokenize());
+        TinyBasicToken[] tokens;
+        
+        try
+        { tokens = lexer.Tokenize(); }
+        catch (TokenizationException ex)
+        {
+            Console.WriteLine($"Syntax error: {ex.Message}");
+            return;
+        }
     
-        int lastPointer = 0;
+        var parser = new LineParser(tokens);
+        int lastPointer = 1;
         while (parser.CanReadLine())
         {
-            TinyBasicToken[] line = parser.ParseLine();
+            if (!parser.ParseLine(out TinyBasicToken[] line, out string? error))
+            {
+                int lineNumber = (line.Length > 0 && line[0].Type is TBTokenType.Number) ? int.Parse(line[0].ToString()) : lastPointer;
+                Console.WriteLine($"Line {lineNumber}: Syntax error: {error}");
+                return;
+            }
+
             if (line[0].Type is TBTokenType.Number)
-            { AddToProgram(line, int.Parse(line[0].ToString()), true); }
+            {
+                int label = int.Parse(line[0].ToString());
+                AddToProgram(line, label++, true);
+                lastPointer = label > lastPointer ? label : lastPointer;
+            }
             else
-            { AddToProgram(line, ++lastPointer, false); }
+            { AddToProgram(line, lastPointer++, false); }
         }
+
         ExecuteProgram();
     }
     
     public void ExecuteDirectly(string line)
     {
         var lexer = new Lexer(line);
-        LineParser parser = new(lexer.Tokenize());
-        TinyBasicToken[] parsedLine = parser.ParseLine();
+        TinyBasicToken[] tokens;
+        try
+        { tokens = lexer.Tokenize(); }
+        catch (TokenizationException ex)
+        {
+            Console.WriteLine($"Syntax error: {ex.Message}");
+            return;
+        }
         
+        LineParser parser = new(tokens);
+        if (!parser.ParseLine(out TinyBasicToken[] parsedLine, out string? error))
+        {
+            Console.WriteLine($"Syntax error: {error}");
+            return;
+        }
+
         if (parsedLine[0].Type is TBTokenType.Number)
-        { AddToProgram(parsedLine, int.Parse(parsedLine[0].ToString()), true); }
-        else
+        {
+            AddToProgram(parsedLine, int.Parse(parsedLine[0].ToString()), true);
+            return;
+        }
+
+        try
         { ExecuteLine(parsedLine); }
+        catch (RuntimeException ex)
+        { Console.WriteLine($"Runtime error: {ex.Message}"); }
     }
 
     private void AddToProgram(TinyBasicToken[] line, int position, bool isLabeled)
     {
-        if (!isLabeled && (line.Length < 2 || line[1].Type is TBTokenType.NewLine))
+        if (isLabeled && (line.Length < 2 || line[1].Type is TBTokenType.NewLine))
         {
             _program.Remove(position);
             return;
@@ -132,10 +173,7 @@ public class TinyBasicEnvironment
             }
             case "CLEAR":
             {
-                _inputQueue.Clear();
-                _returnQueue.Clear();
-                _lineKeyIndex = 0;
-                _program.Clear();
+                Clear();
                 break;
             }
             case "IF":
@@ -160,6 +198,14 @@ public class TinyBasicEnvironment
         }
     }
 
+    private void Clear()
+    {
+        _inputQueue.Clear();
+        _returnQueue.Clear();
+        _lineKeyIndex = 0;
+        _program.Clear();
+    }
+
     private void ExecuteProgram()
     {
         _lineKeyIndex = 0;
@@ -170,7 +216,13 @@ public class TinyBasicEnvironment
         {
             int key = keys[_lineKeyIndex];
             TinyBasicToken[] line = _program[key].line;
-            ExecuteLine(line);
+            try
+            { ExecuteLine(line); }
+            catch (RuntimeException ex)
+            {
+                Console.WriteLine($"Line {key}: Runtime error: {ex.Message}");
+                break;
+            }
             ++_lineKeyIndex;
         }
         _isRunning = false;
@@ -242,8 +294,8 @@ public class TinyBasicEnvironment
             ExpressionTinyBasicToken expression = ParsingUtils.SelectExpressionFromLine(tokens, ref pointer);
             try
             { ParsingUtils.ParseExpression(expression); }
-            catch (Exception ex)
-            { throw new Exception($"Error parsing expression: {ex.Message}"); } // TODO: placeholder
+            catch (ParsingException ex)
+            { throw new ParsingException($"Error parsing expression: {ex.Message}"); } 
             
             expressions.Add(expression);
             pointer += 2;

@@ -39,16 +39,7 @@ public class ConsoleApplication
                     ExecuteFile(commands[1]);
                     break;
                 default:
-                    try
-                    { _environment.ExecuteDirectly(input); }
-                    catch (TokenizationException tokenizationException)
-                    { Console.WriteLine($"Error while tokenizing line: {tokenizationException.Message}"); }
-                    catch (ParsingException parsingException)
-                    { Console.WriteLine($"Error while parsing line: {parsingException.Message}"); }
-                    catch (RuntimeException runtimeException)
-                    { Console.WriteLine($"Error while running code: {runtimeException.Message}"); }
-                    catch (Exception otherException)
-                    { Console.WriteLine($"Unknown error: {otherException.Message}"); }
+                    _environment.ExecuteDirectly(input);
                     break;
             }
         }
@@ -62,10 +53,10 @@ public class ConsoleApplication
 
     private void PrintGreetings()
     {
-        string message = "This is a compiler for TinyBasic. You can type: 'help' to see TinyBasic documentation; " +
-                         "'execute pathToProgram' to execute TinyBasic program; " +
-                         "'exit' to close compiler; " +
-                         "or just start writing your TinyBasic code here line-by-line";
+        string message = "This is a compiler for TinyBasic. You can type: \n - 'help' to see TinyBasic documentation; " +
+                         "\n - 'execute pathToProgram' to execute TinyBasic program; " +
+                         "\n - 'exit' to close compiler; " +
+                         "\n - or just start writing your TinyBasic code here line-by-line";
         Console.WriteLine(message);
     }
     
@@ -75,25 +66,20 @@ public class ConsoleApplication
         Console.CancelKeyPress += env.CancelHandler;
         
         FileInfo fileInfo;
+        string sourceCode;
         try
-        { fileInfo = new FileInfo(filePath); }
+        {
+            fileInfo = new FileInfo(filePath);
+            sourceCode = File.ReadAllText(fileInfo.FullName);
+        }
         catch (Exception ex)
         {
             Console.WriteLine($"Error reading file: {ex.Message}");
+            Console.CancelKeyPress -= env.CancelHandler;
             return;
         }
         
-        string sourceCode = File.ReadAllText(fileInfo.FullName);
-        try
-        { env.ExecuteFile(sourceCode); }
-        catch (TokenizationException tokenizationException)
-        { Console.WriteLine($"Error while tokenizing file: {tokenizationException.Message}"); }
-        catch (ParsingException parsingException)
-        { Console.WriteLine($"Error while parsing file: {parsingException.Message}"); }
-        catch (RuntimeException runtimeException)
-        { Console.WriteLine($"Error while running code: {runtimeException.Message}"); }
-        catch (Exception otherException)
-        { Console.WriteLine($"Unknown error: {otherException.Message}"); }
+        env.ExecuteFile(sourceCode);
         Console.CancelKeyPress -= env.CancelHandler;
     }
 }

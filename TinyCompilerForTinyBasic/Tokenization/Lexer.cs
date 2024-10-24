@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace TinyCompilerForTinyBasic;
+namespace TinyCompilerForTinyBasic.Tokenization;
 
 public class Lexer
 {
@@ -44,7 +44,7 @@ public class Lexer
             else if (char.IsLetter(current))
             { tokens.Add(ReadString()); }
             else
-            { throw new TokenizationException($"Unexpected character '{current}'"); }
+            { throw new TokenizationException($"Unexpected character: '{current}'"); }
         }
 
         return tokens.ToArray();
@@ -167,7 +167,7 @@ public class Lexer
                 }
             }
             default: // shouldn't ever get here; exists just to close default switch statement
-            { throw new TokenizationException("Unexpected operator"); } 
+            { throw new TokenizationException($"Unexpected operator: {_sourceCode[_pointer]}"); } 
         }
     }
 }
