@@ -11,17 +11,17 @@ public static class ParsingUtils
         while ((start + 1) < line.Length)
         {
             TinyBasicToken token = line[start + 1];
-            if (token.Type is not (TBTokenType.ParenthesisClose or TBTokenType.ParenthesisOpen or
-                TBTokenType.OperatorPlus or TBTokenType.OperatorMinus or
-                TBTokenType.OperatorDivision or TBTokenType.OperatorMultiplication or
-                TBTokenType.Number or TBTokenType.String))
-            { break; }
-                
             if (token.Type is TBTokenType.String)
             {
                 if (!char.TryParse(token.ToString(), out _))
                 { break; }
             }
+            else if (token.Type is not (TBTokenType.ParenthesisClose or TBTokenType.ParenthesisOpen or
+                TBTokenType.OperatorPlus or TBTokenType.OperatorMinus or
+                TBTokenType.OperatorDivision or TBTokenType.OperatorMultiplication or
+                TBTokenType.Number))
+            { break; }
+            
             ++start;
         }
         return new ExpressionTinyBasicToken(line[pointerCopy..(start + 1)]);
@@ -96,9 +96,9 @@ public static class ParsingUtils
             {
                 ++start;
                 ParseExpression(expressionToken, ref start);
-                if (((start + 1) >= expression.Length) || (expression[start + 1].Type is not TBTokenType.ParenthesisClose))
-                { throw new ParsingException($"Expected a closing parenthesis after expression in \"{expressionToken}\" expression"); }
                 ++start;
+                if ((start >= expression.Length) || (expression[start].Type is not TBTokenType.ParenthesisClose))
+                { throw new ParsingException($"Expected a closing parenthesis after expression in \"{expressionToken}\" expression"); }
                 
                 return;
             }

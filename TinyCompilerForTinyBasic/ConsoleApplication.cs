@@ -64,12 +64,11 @@ public class ConsoleApplication
     {
         var env = new TinyBasicEnvironment();
         Console.CancelKeyPress += env.CancelHandler;
-        
-        FileInfo fileInfo;
+
         string sourceCode;
         try
         {
-            fileInfo = new FileInfo(filePath);
+            var fileInfo = new FileInfo(filePath);
             sourceCode = File.ReadAllText(fileInfo.FullName);
         }
         catch (Exception ex)

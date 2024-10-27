@@ -26,7 +26,6 @@ public class LineParser
         TinyBasicToken? next;
         if (token.Type is TBTokenType.Number)
         {
-            line.Add(token);
             int value = int.Parse(token.ToString());
             if (value is < 0 or > short.MaxValue)
             {
@@ -34,6 +33,7 @@ public class LineParser
                 result = line.ToArray()!;
                 return false;
             }
+            line.Add(token);    
 
             next = Peek();
             if (next is null)
@@ -68,7 +68,7 @@ public class LineParser
             return true;
         }
         
-        error = $"Expected a new line at \"{LineToString(line)}\"";
+        error = $"Expected a new line after \"{LineToString(line)}\"";
         result = line.ToArray()!;
         return false;
     }
@@ -172,8 +172,8 @@ public class LineParser
         next = Peek();
         if (next is null)
         { throw new ParsingException($"Expected an expression after operator at \"{LineToString(lineToModify)}\""); }
-        ++_pointer;
         
+        ++_pointer;
         expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
         try
         { ParsingUtils.ParseExpression(expression); }
@@ -248,9 +248,9 @@ public class LineParser
             
             ++_pointer;
             next = Peek();
+            lineToModify.Add(next);
             if ((!char.TryParse(next?.ToString(), out address)) || (address is < 'A' or > 'Z'))
             { throw new ParsingException($"Expected a valid variable name at \"{LineToString(lineToModify)}\""); }
-            lineToModify.Add(next);
             
             ++_pointer;
             next = Peek();

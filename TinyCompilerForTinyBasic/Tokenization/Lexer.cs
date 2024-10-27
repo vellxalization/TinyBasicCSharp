@@ -44,7 +44,7 @@ public class Lexer
             else if (char.IsLetter(current))
             { tokens.Add(ReadString()); }
             else
-            { throw new TokenizationException($"Unexpected character: '{current}'"); }
+            { throw new TokenizationException($"Unknown character: '{current}'"); }
         }
 
         return tokens.ToArray();
