@@ -44,7 +44,7 @@ public class Lexer
             else if (char.IsLetter(current))
             { tokens.Add(ReadString()); }
             else
-            { throw new TokenizationException($"Unknown character: '{current}'"); }
+            { throw new UnknownCharacterException($"Unknown character while tokenizing input: '{current}'"); }
         }
 
         return tokens.ToArray();
@@ -64,7 +64,7 @@ public class Lexer
             ++_pointer;
         }
         if ((_pointer >= _sourceCode.Length) || (currentChar is '\n' or '\r'))
-        { throw new TokenizationException($"Failed to find closing quotation mark for: {_sourceCode.Substring(pointerCopy, _pointer - pointerCopy)}"); }
+        { throw new UnmatchedQuotationException($"Failed to find closing quotation mark for: {_sourceCode.Substring(pointerCopy, _pointer - pointerCopy)}"); }
         
         return new ValueTinyBasicToken(TBTokenType.QuotedString, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
     }
@@ -167,7 +167,7 @@ public class Lexer
                 }
             }
             default: // shouldn't ever get here; exists just to close default switch statement
-            { throw new TokenizationException($"Unexpected operator: {_sourceCode[_pointer]}"); } 
+            { throw new UnknownCharacterException($"Unexpected operator: {_sourceCode[_pointer]}"); } 
         }
     }
 }

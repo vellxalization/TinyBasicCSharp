@@ -31,7 +31,7 @@ public static class ParsingUtils
     public static void ParseExpression(ExpressionTinyBasicToken expressionToken)
     {
         if (expressionToken.Components.Length < 1)
-        { throw new ParsingException("Tried to parse an empty expression"); }
+        { throw new EmptyExpressionException("Tried to parse an empty expression"); }
         
         int start = 0;
         ParseExpression(expressionToken, ref start);
@@ -45,7 +45,7 @@ public static class ParsingUtils
         {
             ++start;
             if (start >= expression.Length)
-            { throw new ParsingException($"Expected a term after unary operator \"{token}\""); }
+            { throw new UnexpectedOrEmptyTokenException($"Expected a term after unary operator \"{token}\""); }
         }
         ParseTerm(expressionToken, ref start);
         
@@ -58,7 +58,7 @@ public static class ParsingUtils
             // continue parsing term only if next operator is + or -
             start += 2;
             if (start >= expression.Length)
-            { throw new ParsingException($"Expected a term after \"{token}\" operator in \"{expressionToken}\" expression"); }
+            { throw new UnexpectedOrEmptyTokenException($"Expected a term after \"{token}\" operator in \"{expressionToken}\" expression"); }
             
             ParseTerm(expressionToken, ref start);
         }
@@ -78,7 +78,7 @@ public static class ParsingUtils
             // continue parsing term only if next operator is * or /
             start += 2;
             if (start >= expression.Length)
-            { throw new ParsingException($"Expected a term after \"{token}\" operator in \"{expressionToken}\" expression"); }
+            { throw new UnexpectedOrEmptyTokenException($"Expected a term after \"{token}\" operator in \"{expressionToken}\" expression"); }
             
             ParseFactor(expressionToken, ref start);
         }
@@ -98,19 +98,19 @@ public static class ParsingUtils
                 ParseExpression(expressionToken, ref start);
                 ++start;
                 if ((start >= expression.Length) || (expression[start].Type is not TBTokenType.ParenthesisClose))
-                { throw new ParsingException($"Expected a closing parenthesis after expression in \"{expressionToken}\" expression"); }
+                { throw new UnexpectedOrEmptyTokenException($"Expected a closing parenthesis after expression in \"{expressionToken}\" expression"); }
                 
                 return;
             }
             case TBTokenType.String:
             {
                 if ((!char.TryParse(token.ToString(), out char address)) || (address is < 'A' or > 'Z'))
-                { throw new ParsingException($"Expected a valid variable name (\"{token}\") in \"{expressionToken}\" expression"); }
+                { throw new InvalidVariableNameException($"Expected a valid variable name (\"{token}\") in \"{expressionToken}\" expression"); }
 
                 return;
             }
             default:
-            { throw new ParsingException($"Unexpected token (\"{token}\") while parsing factor in \"{expressionToken}\" expression"); }
+            { throw new UnexpectedOrEmptyTokenException($"Unexpected token (\"{token}\") while parsing factor in \"{expressionToken}\" expression"); }
         }
     }
 }

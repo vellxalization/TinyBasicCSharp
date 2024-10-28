@@ -59,7 +59,7 @@ public class ExpressionEvaluator
             else
             {
                 if (secondValue is 0)
-                { throw new RuntimeException("Tried to divide by zero"); }
+                { throw new DivisionByZeroException("Tried to divide by zero"); }
                 value /= secondValue;
             }
         }
@@ -78,7 +78,7 @@ public class ExpressionEvaluator
                 char address = char.Parse(token.ToString());
                 short? value = _memory.ReadVariable(address);
                 if (value is null)
-                { throw new RuntimeException($"Tried to read an uninitialized variable \"{address}\""); }
+                { throw new UnitializedVariableException($"Tried to read an uninitialized variable \"{address}\""); }
 
                 return value.Value;
             }
