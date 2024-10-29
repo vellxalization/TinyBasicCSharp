@@ -187,6 +187,8 @@ public class LineParser
         { throw new UnexpectedOrEmptyTokenException($"Expected a THEN keyword after expression at \"{LineToString(lineToModify)}\""); }
         ++_pointer;
         
+        next = Peek();
+        lineToModify.Add(next);
         if (next is null)
         { throw new UnexpectedOrEmptyTokenException($"Expected a statement after THEN keyword at \"{LineToString(lineToModify)}\""); }
         ++_pointer;

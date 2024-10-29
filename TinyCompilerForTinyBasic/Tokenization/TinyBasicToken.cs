@@ -61,8 +61,8 @@ public class ValueTinyBasicToken : TinyBasicToken
 
 public class ExpressionTinyBasicToken : TinyBasicToken
 {
-    public ExpressionTinyBasicToken(){}
-    public ExpressionTinyBasicToken(TinyBasicToken[] tokens) : base(TBTokenType.Expression) => Components = tokens;
+    public ExpressionTinyBasicToken() : base(TBTokenType.Expression) { }
+    public ExpressionTinyBasicToken(TinyBasicToken[] tokens) : this() => Components = tokens;
     public TinyBasicToken[] Components { get; init; } = [];
 
     public override string ToString()

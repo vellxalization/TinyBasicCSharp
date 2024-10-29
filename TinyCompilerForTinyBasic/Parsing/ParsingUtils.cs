@@ -6,27 +6,36 @@ public static class ParsingUtils
 {
     public static ExpressionTinyBasicToken SelectExpressionFromLine(TinyBasicToken[] line, ref int start)
     {
-        int pointerCopy = start;
+        if (!IsValidExpressionToken(line[start]))
+        { return new ExpressionTinyBasicToken(); }
 
+        int pointerCopy = start;
         while ((start + 1) < line.Length)
         {
             TinyBasicToken token = line[start + 1];
-            if (token.Type is TBTokenType.String)
-            {
-                if (!char.TryParse(token.ToString(), out _))
-                { break; }
-            }
-            else if (token.Type is not (TBTokenType.ParenthesisClose or TBTokenType.ParenthesisOpen or
-                TBTokenType.OperatorPlus or TBTokenType.OperatorMinus or
-                TBTokenType.OperatorDivision or TBTokenType.OperatorMultiplication or
-                TBTokenType.Number))
+            if (!IsValidExpressionToken(token))
             { break; }
             
             ++start;
         }
         return new ExpressionTinyBasicToken(line[pointerCopy..(start + 1)]);
     }
-    
+
+    private static bool IsValidExpressionToken(TinyBasicToken token)
+    {
+        if (token.Type is TBTokenType.String)
+        {
+            if (!char.TryParse(token.ToString(), out _))
+            { return false; }
+        }
+        else if (token.Type is not (TBTokenType.ParenthesisClose or TBTokenType.ParenthesisOpen or
+                 TBTokenType.OperatorPlus or TBTokenType.OperatorMinus or
+                 TBTokenType.OperatorDivision or TBTokenType.OperatorMultiplication or
+                 TBTokenType.Number))
+        { return false; }
+
+        return true;
+    }
     
     public static void ParseExpression(ExpressionTinyBasicToken expressionToken)
     {
@@ -35,6 +44,8 @@ public static class ParsingUtils
         
         int start = 0;
         ParseExpression(expressionToken, ref start);
+        if (start < (expressionToken.Components.Length - 1))
+        { throw new UnexpectedOrEmptyTokenException($"Unexpected token ('{expressionToken.Components[start]}') at the end of expression"); }
     }
     
     private static void ParseExpression(ExpressionTinyBasicToken expressionToken, ref int start)

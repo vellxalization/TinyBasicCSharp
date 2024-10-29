@@ -32,8 +32,8 @@ public class ExpressionSelectorTests
     {
         return index switch
         {
-            0 => [new ValueTinyBasicToken(TBTokenType.String, "X")], // X
-            1 => [new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus), // X + LET *
+            0 => [new ValueTinyBasicToken(TBTokenType.String, "X")],
+            1 => [new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus),
                 new ValueTinyBasicToken(TBTokenType.String, "LET"), new TinyBasicToken(TBTokenType.OperatorMultiplication)],
             2 => [new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus), new ValueTinyBasicToken(TBTokenType.Number, "10"),
             new TinyBasicToken(TBTokenType.OperatorMultiplication), new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.ParenthesisOpen),

@@ -36,14 +36,14 @@ public class ExpressionEvaluator
 
             start += 2;
             int secondValue = EvaluateTerm(expression, ref start);
-            value = op.Type is TBTokenType.OperatorPlus ? (value + secondValue) : (value - secondValue);
+            value = op.Type is TBTokenType.OperatorPlus ? unchecked((short)(value + secondValue)) : unchecked((short)(value - secondValue));
         }
         return unchecked((short)value);
     }
     
-    private int EvaluateTerm(TinyBasicToken[] expression, ref int start)
+    private short EvaluateTerm(TinyBasicToken[] expression, ref int start)
     {
-        int value = EvaluateFactor(expression, ref start);
+        short value = EvaluateFactor(expression, ref start);
 
         while ((start + 1) < expression.Length)
         {
@@ -52,27 +52,30 @@ public class ExpressionEvaluator
             { break; }
             
             start += 2;
-            int secondValue = EvaluateFactor(expression, ref start);
+            short secondValue = EvaluateFactor(expression, ref start);
             
             if (op.Type is TBTokenType.OperatorMultiplication)
-            { value *= secondValue; } 
+            { value = unchecked((short)(value * secondValue)); } 
             else
             {
                 if (secondValue is 0)
                 { throw new DivisionByZeroException("Tried to divide by zero"); }
-                value /= secondValue;
+                value = unchecked((short)(value / secondValue));
             }
         }
         return value;
     }
     
-    private int EvaluateFactor(TinyBasicToken[] expression, ref int start)
+    private short EvaluateFactor(TinyBasicToken[] expression, ref int start)
     {
         TinyBasicToken token = expression[start];
         switch (token.Type)
         {
             case TBTokenType.Number:
-            { return int.Parse(token.ToString()); }
+            {
+                int value = int.Parse(token.ToString());
+                return unchecked((short)value);
+            }
             case TBTokenType.String:
             {
                 char address = char.Parse(token.ToString());
