@@ -52,6 +52,7 @@ public class ExpressionEvaluatorTests
     [InlineData("32768/8", -4096)]
     [InlineData("30720+30720", -4096)]
     [InlineData("10 + Y", 10)]
+    [InlineData("-10 + ----(---10)", -20)]
     [InlineData("10 * Y", 0)]
     [InlineData("10 * (Y + 10)", 100)]
     [InlineData("10 * (10 * (10 + 30) / 2)", 2000)]

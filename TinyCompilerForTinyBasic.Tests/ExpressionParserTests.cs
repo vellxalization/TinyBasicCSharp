@@ -13,7 +13,7 @@ public class ExpressionParserTests
     [InlineData(5)]
     [InlineData(6)]
     [InlineData(7)]
-    [InlineData(100)]
+    [InlineData(8)]
     public void ExpressionParserInvalidTokenException(int index)
     {
         var expression = GetInvalidExpression(index);
@@ -40,6 +40,8 @@ public class ExpressionParserTests
     [InlineData(2)]
     [InlineData(3)]
     [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
     public void ExpressionParserTesting(int index)
     {
         // shouldn't get any exceptions
@@ -60,7 +62,14 @@ public class ExpressionParserTests
                     new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus),
                     new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.ParenthesisClose)
                 ] },
-            3 => new ExpressionTinyBasicToken() // ((-X + (-100)))
+            3 => new ExpressionTinyBasicToken() // (---X)
+            { Components = 
+            [
+                new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus),
+                new TinyBasicToken(TBTokenType.OperatorMinus), new TinyBasicToken(TBTokenType.OperatorMinus),
+                new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.ParenthesisClose)
+            ] },
+            4 => new ExpressionTinyBasicToken() // ((-X + (-100)))
             { Components = 
             [
                 new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus),
@@ -68,7 +77,7 @@ public class ExpressionParserTests
                 new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.Number, "100"), new TinyBasicToken(TBTokenType.ParenthesisClose),
                 new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose)
             ] },
-            4 => new ExpressionTinyBasicToken() // ((-X + 100 * (100 + Y * (124 - (24)))))
+            5 => new ExpressionTinyBasicToken() // ((-X + 100 * (100 + Y * (124 - (24)))))
             { Components = 
                 [
                     new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus),
@@ -79,6 +88,13 @@ public class ExpressionParserTests
                     new TinyBasicToken(TBTokenType.OperatorMinus), new TinyBasicToken(TBTokenType.ParenthesisOpen), new ValueTinyBasicToken(TBTokenType.Number, "24"),
                     new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose), 
                     new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose)
+                ]
+            },
+            6 => new ExpressionTinyBasicToken() // -X + -10 
+            { Components = 
+                [
+                    new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus),
+                    new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.Number, "10")
                 ]
             },
             _ => new ExpressionTinyBasicToken()
@@ -108,27 +124,26 @@ public class ExpressionParserTests
                     new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), 
                     new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus)
                 ] },
-            6 => new ExpressionTinyBasicToken() // (-X 2)
+            6 => new ExpressionTinyBasicToken() // -X - -
+            { Components = 
+            [
+                new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.String, "X"), 
+                new TinyBasicToken(TBTokenType.OperatorMinus), new TinyBasicToken(TBTokenType.OperatorMinus)
+            ] },
+            7 => new ExpressionTinyBasicToken() // (-X 2)
                 { Components = 
                 [
                     new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), 
                     new ValueTinyBasicToken(TBTokenType.String, "X"), new ValueTinyBasicToken(TBTokenType.Number, "2"),
                     new TinyBasicToken(TBTokenType.ParenthesisClose)
                 ] },
-            7 => new ExpressionTinyBasicToken() // (-X <> 2)
+            8 => new ExpressionTinyBasicToken() // (-X <> 2)
                 { Components = 
                 [
                     new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), 
                     new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorNotEqual), 
                     new ValueTinyBasicToken(TBTokenType.Number, "2"), new TinyBasicToken(TBTokenType.ParenthesisClose)
                 ] },
-            100 => new ExpressionTinyBasicToken() // -X + -10 //TODO: currently not supporting this kind of negation. Workaround: replace -10 with (-10)
-            { Components = 
-                [
-                    new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus),
-                    new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.Number, "10")
-                ]
-            },
             _ => new ExpressionTinyBasicToken(),
         };
     }

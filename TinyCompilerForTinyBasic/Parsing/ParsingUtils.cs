@@ -51,18 +51,11 @@ public static class ParsingUtils
     private static void ParseExpression(ExpressionTinyBasicToken expressionToken, ref int start)
     {
         TinyBasicToken[] expression = expressionToken.Components;
-        TinyBasicToken token = expression[start];
-        if (token.Type is TBTokenType.OperatorPlus or TBTokenType.OperatorMinus)
-        {
-            ++start;
-            if (start >= expression.Length)
-            { throw new UnexpectedOrEmptyTokenException($"Expected a term after unary operator \"{token}\""); }
-        }
         ParseTerm(expressionToken, ref start);
         
         while ((start + 1) < expression.Length)
         {
-            token = expression[start + 1];
+            TinyBasicToken token = expression[start + 1];
             if (token.Type is not (TBTokenType.OperatorPlus or TBTokenType.OperatorMinus))
             { return; } 
             
@@ -98,9 +91,17 @@ public static class ParsingUtils
     private static void ParseFactor(ExpressionTinyBasicToken expressionToken, ref int start)
     {
         TinyBasicToken[] expression = expressionToken.Components;
+        res:
         TinyBasicToken token = expression[start];
         switch (token.Type)
         {
+            case (TBTokenType.OperatorPlus or TBTokenType.OperatorMinus):
+            {
+                ++start;
+                if (start >= expression.Length)
+                { throw new UnexpectedOrEmptyTokenException($"Unary operator with no number or variable in \"{expressionToken}\" expression"); }
+                goto res;
+            }
             case TBTokenType.Number:
             { return; }
             case TBTokenType.ParenthesisOpen:

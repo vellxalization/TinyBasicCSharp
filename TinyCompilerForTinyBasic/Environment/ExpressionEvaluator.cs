@@ -17,17 +17,8 @@ public class ExpressionEvaluator
 
     private short EvaluateExpression(TinyBasicToken[] expression, ref int start)
     {
-        TinyBasicToken token = expression[start];
-        bool shouldNegate = false;
-        if (token.Type is TBTokenType.OperatorPlus or TBTokenType.OperatorMinus)
-        {
-            shouldNegate = token.Type == TBTokenType.OperatorMinus;
-            ++start;
-        }
         int value = EvaluateTerm(expression, ref start);
-        if (shouldNegate)
-        { value = -value; }
-
+        
         while ((start + 1) < expression.Length)
         {
             TinyBasicToken op = expression[start + 1];
@@ -68,13 +59,26 @@ public class ExpressionEvaluator
     
     private short EvaluateFactor(TinyBasicToken[] expression, ref int start)
     {
+        bool shouldNegate = false;
+        res:
         TinyBasicToken token = expression[start];
         switch (token.Type)
         {
+            case TBTokenType.OperatorMinus:
+            {
+                shouldNegate = !shouldNegate;
+                ++start;
+                goto res;
+            }
+            case TBTokenType.OperatorPlus:
+            {
+                ++start;
+                goto res;
+            }
             case TBTokenType.Number:
             {
                 int value = int.Parse(token.ToString());
-                return unchecked((short)value);
+                return shouldNegate ? unchecked((short)-value) : unchecked((short)value);
             }
             case TBTokenType.String:
             {
@@ -83,7 +87,7 @@ public class ExpressionEvaluator
                 if (value is null)
                 { throw new UnitializedVariableException($"Tried to read an uninitialized variable \"{address}\""); }
 
-                return value.Value;
+                return (short)(shouldNegate ? -value.Value : value.Value);
             }
             case TBTokenType.ParenthesisOpen:
             {
