@@ -2,6 +2,9 @@
 
 namespace TinyCompilerForTinyBasic;
 
+/// <summary>
+/// Main class for interacting with user
+/// </summary>
 public class ConsoleApplication
 {
     private TinyBasicEnvironment _environment = new();
@@ -11,24 +14,23 @@ public class ConsoleApplication
         Console.CancelKeyPress += _environment.CancelHandler;
     }
 
+    /// <summary>
+    /// Main cycle. Asks user for input and executes commands/code
+    /// </summary>
     public void Run()
     {
         Manual.PrintGreetings();
-        bool isRunning = true;
-        while (isRunning)
+        while (true)
         {
             string input = Console.ReadLine() ?? "";
             if (string.IsNullOrEmpty(input))
-            {
-                continue;
-            }
+            { continue; }
 
             string[] commands = input.Split(" ");
             switch (commands[0])
             {
                 case "exit":
-                    isRunning = false;
-                    break;
+                    return;
                 case "help":
                     PrintHelp(commands);
                     break;
@@ -48,6 +50,10 @@ public class ConsoleApplication
         }
     }
 
+    /// <summary>
+    /// Handles 'help' command
+    /// </summary>
+    /// <param name="commands">User input separated by space</param>
     private void PrintHelp(string[] commands)
     {
         if (commands.Length < 2 || string.IsNullOrEmpty(commands[1]))
@@ -100,6 +106,10 @@ public class ConsoleApplication
         }
     }
 
+    /// <summary>
+    /// Tries to read a file, load and execute it
+    /// </summary>
+    /// <param name="filePath">Path to .bas file</param>
     private void ExecuteFile(string filePath)
     {
         var env = new TinyBasicEnvironment();
@@ -122,6 +132,9 @@ public class ConsoleApplication
         Console.CancelKeyPress -= env.CancelHandler;
     }
 
+    /// <summary>
+    /// Class for printing all possible help messages
+    /// </summary>
     private static class Manual
     {
         public static void PrintGreetings()

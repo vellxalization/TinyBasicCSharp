@@ -2,11 +2,21 @@
 
 namespace TinyCompilerForTinyBasic.Environment;
 
+/// <summary>
+/// Class for evaluating expressions
+/// </summary>
 public class ExpressionEvaluator
 {
     private EnvironmentMemory _memory;
     public ExpressionEvaluator(EnvironmentMemory memory) => _memory = memory;
 
+    /// <summary>
+    /// Evaluates provided expression.
+    /// TinyBasic works with signed short values, making it very susceptible for under- and overflows.
+    /// Evaluator must share same memory with environment
+    /// </summary>
+    /// <param name="expression">Syntactically correct expression</param>
+    /// <returns>Value of expression</returns>
     public short EvaluateExpression(TinyBasicToken[] expression)
     {
         int start = 0;

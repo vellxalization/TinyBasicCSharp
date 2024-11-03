@@ -2,12 +2,21 @@
 
 namespace TinyCompilerForTinyBasic.Tokenization;
 
+/// <summary>
+/// Class for tokenizing a string
+/// </summary>
 public class Lexer
 {
     public Lexer(string sourceCode) => _sourceCode = sourceCode;
     private string _sourceCode;
     private int _pointer = 0;
 
+    /// <summary>
+    /// Tokenizes input from constructor
+    /// </summary>
+    /// <returns>An array of TinyBasic tokens</returns>
+    /// <exception cref="UnknownCharacterException">Unknown character has occurred during tokenization</exception>
+    /// <exception cref="UnmatchedQuotationException">End of input reached without closing quote</exception>
     public TinyBasicToken[] Tokenize()
     {
         var tokens = new List<TinyBasicToken>();
@@ -50,6 +59,13 @@ public class Lexer
         return tokens.ToArray();
     }
 
+    /// <summary>
+    /// Used for reading quoted strings.
+    /// Pointer should be moved to the next character after opening quotation mark before calling.
+    /// Stops on the first quotation mark it encounters
+    /// </summary>
+    /// <returns>Value token with quoted string</returns>
+    /// <exception cref="UnmatchedQuotationException">End of input reached without closing quote</exception>
     private ValueTinyBasicToken ReadQuotedString()
     {
         int pointerCopy = _pointer;
@@ -68,7 +84,12 @@ public class Lexer
         
         return new ValueTinyBasicToken(TBTokenType.QuotedString, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
     }
-
+    
+    /// <summary>
+    /// Used to read numbers.
+    /// Stops at the first letter or newline
+    /// </summary>
+    /// <returns>Value token with number</returns>
     private ValueTinyBasicToken ReadNumber()
     {
         var builder = new StringBuilder();
@@ -96,6 +117,11 @@ public class Lexer
         return new ValueTinyBasicToken(TBTokenType.Number, builder.ToString());
     }
 
+    /// <summary>
+    /// Used to read strings such as variables and keywords.
+    /// Stops at the first non-letter character
+    /// </summary>
+    /// <returns>Value token with string</returns>
     private ValueTinyBasicToken ReadString()
     {
         int pointerCopy = _pointer;
@@ -111,7 +137,11 @@ public class Lexer
         
         return new ValueTinyBasicToken(TBTokenType.String, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
     }
-
+    
+    /// <summary>
+    /// Reads an operator or parenthesis
+    /// </summary>
+    /// <returns>Token with type according to parsed operator or parenthesis</returns>
     private TinyBasicToken ReadOperatorOrParenthesis()
     {
         switch (_sourceCode[_pointer])

@@ -2,8 +2,18 @@
 
 namespace TinyCompilerForTinyBasic.Parsing;
 
+/// <summary>
+/// Collection of helper methods used for parsing tokens
+/// </summary>
 public static class ParsingUtils
 {
+    /// <summary>
+    /// Matches all possible expression tokens (operators, variables, numbers) and combines them into a single token
+    /// </summary>
+    /// <param name="line">Array of tokens</param>
+    /// <param name="start">Reference to the int pointer from where method will try to select the expression.
+    /// Will be incremented in the process</param>
+    /// <returns>Expression token containing collection of tokens (if any found)</returns>
     public static ExpressionTinyBasicToken SelectExpressionFromLine(TinyBasicToken[] line, ref int start)
     {
         if (!IsValidExpressionToken(line[start]))
@@ -37,6 +47,13 @@ public static class ParsingUtils
         return true;
     }
     
+    /// <summary>
+    /// Checks if the expression is syntactically correct. Returns if true, otherwise will throw exception
+    /// </summary>
+    /// <param name="expressionToken">Expression to check</param>
+    /// <exception cref="EmptyExpressionException">Expression contains no tokens</exception>
+    /// <exception cref="UnexpectedOrEmptyTokenException">Got no token or an unexpected one. Check error message for more details</exception>
+    /// <exception cref="InvalidVariableNameException">Got an invalid character while reading variable name</exception>
     public static void ParseExpression(ExpressionTinyBasicToken expressionToken)
     {
         if (expressionToken.Components.Length < 1)

@@ -2,6 +2,9 @@
 
 namespace TinyCompilerForTinyBasic.Tokenization;
 
+/// <summary>
+/// A TinyBasic token. Base class for ValueTinyBasicToken and ExpressionTinyBasicToken.
+/// </summary>
 public class TinyBasicToken
 {
     public TinyBasicToken(){}
@@ -49,6 +52,9 @@ public class TinyBasicToken
     }
 }
 
+/// <summary>
+/// TinyBasic token for storing variable values, such as strings and numbers
+/// </summary>
 public class ValueTinyBasicToken : TinyBasicToken
 {
     public ValueTinyBasicToken(){}
@@ -59,6 +65,9 @@ public class ValueTinyBasicToken : TinyBasicToken
     public override string ToString() => Value;
 }
 
+/// <summary>
+/// TinyBasic token for storing expressions (a sequence of numbers, operators and variables)
+/// </summary>
 public class ExpressionTinyBasicToken : TinyBasicToken
 {
     public ExpressionTinyBasicToken() : base(TBTokenType.Expression) { }

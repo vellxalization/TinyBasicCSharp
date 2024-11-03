@@ -3,6 +3,9 @@ using TinyCompilerForTinyBasic.Tokenization;
 
 namespace TinyCompilerForTinyBasic.Parsing;
 
+/// <summary>
+/// Class for parsing array of tokens
+/// </summary>
 public class LineParser
 {
     private TinyBasicToken[] _tokens;
@@ -10,6 +13,12 @@ public class LineParser
     
     public LineParser(TinyBasicToken[] tokens) => _tokens = tokens;
 
+    /// <summary>
+    /// Parses a single line of code, separated by new line
+    /// </summary>
+    /// <param name="result">An array of tokens containing all successfully parsed tokens</param>
+    /// <param name="error">Error message if parsing was failed</param>
+    /// <returns>Was parsing successful</returns>
     public bool ParseLine(out TinyBasicToken[] result, out string? error)
     {
         error = null;
@@ -188,7 +197,6 @@ public class LineParser
         ++_pointer;
         
         next = Peek();
-        lineToModify.Add(next);
         if (next is null)
         { throw new UnexpectedOrEmptyTokenException($"Expected a statement after THEN keyword at \"{LineToString(lineToModify)}\""); }
         ++_pointer;

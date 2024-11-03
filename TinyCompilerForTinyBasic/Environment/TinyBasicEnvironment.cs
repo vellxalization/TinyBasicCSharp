@@ -103,15 +103,27 @@ public class TinyBasicEnvironment
     
     private void AddToProgram(TinyBasicToken[] line, int position, bool isLabeled)
     {
-        if (line.Length < 2 || line[1].Type is TBTokenType.NewLine)
+        if (!isLabeled)
         {
-            if (isLabeled)
-            { _program.Remove(position); }
+            if (!_program.TryAdd(position, (line, false)))
+            { _program[position] = (line, false); }
+
+            return;
+        }
+
+        if (line.Length < 2)
+        {
+            _program.Remove(position);
+            return;
+        }
+
+        if (line[1].Type is TBTokenType.NewLine)
+        {
+            _program.Remove(position);
             return;
         }
         
-        if (!_program.TryAdd(position, (line, isLabeled)))
-        { _program[position] = (line, isLabeled); }
+        _program.Add(position, (line, true));
     }
     
     private void ExecuteLine(TinyBasicToken[] line)
@@ -211,22 +223,25 @@ public class TinyBasicEnvironment
     private void ExecuteProgram()
     {
         _lineKeyIndex = 0;
-        IList<int> keys = _program.Keys;
+        // IList<int> keys = _program.Keys;
 
         _isRunning = true;
-        while (_isRunning && _lineKeyIndex < keys.Count)
+        while (_isRunning && _lineKeyIndex < _program.Count)
         {
-            int key = keys[_lineKeyIndex];
-            TinyBasicToken[] line = _program[key].line;
+            // int key = keys[_lineKeyIndex];
+            TinyBasicToken[] line = _program.GetValueAtIndex(_lineKeyIndex).line;
             try
             { ExecuteLine(line); }
             catch (RuntimeException ex)
             {
-                Console.WriteLine($"Line {key}: Runtime error: {ex.Message}");
-                break;
+                Console.WriteLine($"Line {_program.GetKeyAtIndex(_lineKeyIndex)}: Runtime error: {ex.Message}");
+                return;
             }
             ++_lineKeyIndex;
         }
+
+        if (_isRunning)
+        { Console.WriteLine("Runtime error: Run out of lines. Possibly missed the END or RETURN keyword?"); }
         _isRunning = false;
     }
     
@@ -251,7 +266,7 @@ public class TinyBasicEnvironment
         var expression = (ExpressionTinyBasicToken)line[start];
         short label = _evaluator.EvaluateExpression(expression.Components);
         if ((!_program.TryGetValue(label, out var instruction)) || (!instruction.isLabeled))
-        { throw new Exception($"Label {label} does not exist"); }
+        { throw new RuntimeException($"Label {label} does not exist"); }
 
         if (isSubroutine)
         { _returnQueue.Enqueue(_lineKeyIndex); }
@@ -351,13 +366,14 @@ public class TinyBasicEnvironment
     
     private bool CheckCondition(short value1, short value2, TinyBasicToken op)
     {
-        return op.ToString() switch
+        return op.Type switch
         {
-            "<" => value1 < value2,
-            "<=" => value1 <= value2,
-            ">" => value1 > value2,
-            ">=" => value1 >= value2,
-            "=" => value1 == value2,
+            TBTokenType.OperatorGreaterThan => value1 > value2,
+            TBTokenType.OperatorGreaterThanOrEqual => value1 >= value2,
+            TBTokenType.OperatorLessThan => value1 < value2,
+            TBTokenType.OperatorLessThanOrEqual => value1 <= value2,
+            TBTokenType.OperatorEquals => value1 == value2,
+            TBTokenType.OperatorNotEqual => value1 != value2,
             _ => throw new Exception("Unknown operator") // will be caught by parser, exists just to close default case
         };
     }
