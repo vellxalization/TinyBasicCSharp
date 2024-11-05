@@ -152,7 +152,7 @@ public class ConsoleApplication
                 "Type 'execute <path>.bas' to execute .bas TinyBasic file.\n" +
                 "This behaves slightly different than entered into the terminal code — type 'help execute' to learn more.\n" +
                 "Type '[<lineNumber>] <statement> [<arguments>]' to execute TinyBasic code.\n" +
-                "Currently this compiler supports N statements: IF, GOTO, GOSUB, INPUT, LET, RETURN, CLEAR, LIST, RUN, END.\n" +
+                "Currently this compiler supports 11 statements: IF, GOTO, GOSUB, INPUT, LET, RETURN, CLEAR, LIST, RUN, END.\n" +
                 "You can either type them directly (e.g. PRINT \"HELLO WORLD\") and get immediate response or you can add a label from 1 to 32767 inclusively (e.g. 1 PRINT \"HELLO WORLD\") to write line into the memory and execute it later as a part of program.";
             Console.WriteLine(message);
         }
