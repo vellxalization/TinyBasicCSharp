@@ -5,7 +5,7 @@ An implementation of a design note variant of Tiny Basic language with some addi
 * Support of 12 keywords (PRINT, IF-THEN, GOTO, GOSUB, INPUT, LET, RETURN, CLEAR, LIST, RUN, END).
 * Terminal mode — just write your code in terminal and get immediate response...
 * ... or run your .bas file with file execution.
-* No Nuget dependencies.
+* No Nuget dependencies (except ones for unit testing).
 * Basic manual is included in 'help' command.
 
 # Some thoughts and future plans (both short- and long-term)
