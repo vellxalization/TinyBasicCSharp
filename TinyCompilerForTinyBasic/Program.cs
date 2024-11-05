@@ -1,2 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+﻿using TinyCompilerForTinyBasic;
+
+var a = new ConsoleApplication();
+a.Run();
