@@ -51,12 +51,12 @@ public class TinyBasicEnvironment
         {
             if (!parser.ParseLine(out TinyBasicToken[] line, out string? error))
             {
-                int lineNumber = (line.Length > 0 && line[0].Type is TBTokenType.Number) ? int.Parse(line[0].ToString()) : pointer;
+                int lineNumber = (line.Length > 0 && line[0].Type is TokenType.Number) ? int.Parse(line[0].ToString()) : pointer;
                 Console.WriteLine($"Line {lineNumber}: Syntax error: {error}");
                 return;
             }
 
-            if (line[0].Type is not TBTokenType.Number)
+            if (line[0].Type is not TokenType.Number)
             {
                 AddToProgram(line, pointer++, false);
                 continue;
@@ -89,7 +89,7 @@ public class TinyBasicEnvironment
             return;
         }
 
-        if (parsedLine[0].Type is TBTokenType.Number)
+        if (parsedLine[0].Type is TokenType.Number)
         {
             AddToProgram(parsedLine, int.Parse(parsedLine[0].ToString()), true);
             return;
@@ -117,7 +117,7 @@ public class TinyBasicEnvironment
             return;
         }
 
-        if (line[1].Type is TBTokenType.NewLine)
+        if (line[1].Type is TokenType.NewLine)
         {
             _program.Remove(position);
             return;
@@ -128,23 +128,23 @@ public class TinyBasicEnvironment
     
     private void ExecuteLine(TinyBasicToken[] line)
     {
-        int commandIndex = line[0].Type is TBTokenType.Number ? 1 : 0; // skip line number
+        int commandIndex = line[0].Type is TokenType.Number ? 1 : 0; // skip line number
         string command = line[commandIndex].ToString();
         switch (command)
         {
             case "LET":
             {
                 char address = char.Parse(line[commandIndex + 1].ToString());
-                var expression = (ExpressionTinyBasicToken)line[commandIndex + 3];
+                var expression = (ExpressionToken)line[commandIndex + 3];
                 short value = _evaluator.EvaluateExpression(expression.Components);
                 _memory.WriteVariable(value, address);
-                break;
+                return;
             }
             case "PRINT":
             {
                 string text = ExpressionListToString(line);
                 Console.WriteLine(text);
-                break;
+                return;
             }
             case "INPUT":
             {
@@ -155,17 +155,17 @@ public class TinyBasicEnvironment
                     { addresses.Add(address); }
                 }
                 LoadAddressesWithValues(addresses);
-                break;
+                return;
             }
             case "GOTO":
             {
                 GoToLabel((commandIndex + 1), line, false);
-                break;
+                return;
             }
             case "GOSUB":
             {
                 GoToLabel((commandIndex + 1), line, true);
-                break;
+                return;
             }
             case "RETURN":
             {
@@ -173,42 +173,46 @@ public class TinyBasicEnvironment
                 { throw new RuntimeException("Tried to return without invoking a subroutine"); }
                 
                 _lineKeyIndex = lineNumber;
-                break;
+                return;
             }
             case "END":
             {
                 _isRunning = false;
-                break;
+                return;
             }
             case "LIST":
             {
                 PrintProgram();
-                break;
+                return;
             }
             case "CLEAR":
             {
                 Clear();
-                break;
+                return;
             }
             case "IF":
             {
                 TinyBasicToken op = line[commandIndex + 2];
                 
-                var expression = (ExpressionTinyBasicToken)line[commandIndex + 1];
+                var expression = (ExpressionToken)line[commandIndex + 1];
                 short value1 = _evaluator.EvaluateExpression(expression.Components);
-                expression = (ExpressionTinyBasicToken)line[commandIndex + 3];
+                expression = (ExpressionToken)line[commandIndex + 3];
                 short value2 = _evaluator.EvaluateExpression(expression.Components);
                 
                 if (CheckCondition(value1, value2, op))
                 { ExecuteLine(line[(commandIndex + 5)..]); }
                 
-                break;
+                return;
             }
             case "RUN":
             {
                 ExecuteProgram();
-                break;
+                return;
             }
+            case "REM":
+            { return; }
+            default:
+            { throw new RuntimeException($"Tried to execute unknown command: {command}"); }
         }
     }
 
@@ -223,12 +227,10 @@ public class TinyBasicEnvironment
     private void ExecuteProgram()
     {
         _lineKeyIndex = 0;
-        // IList<int> keys = _program.Keys;
 
         _isRunning = true;
         while (_isRunning && _lineKeyIndex < _program.Count)
         {
-            // int key = keys[_lineKeyIndex];
             TinyBasicToken[] line = _program.GetValueAtIndex(_lineKeyIndex).line;
             try
             { ExecuteLine(line); }
@@ -263,7 +265,7 @@ public class TinyBasicEnvironment
 
     private void GoToLabel(int start, TinyBasicToken[] line, bool isSubroutine)
     {
-        var expression = (ExpressionTinyBasicToken)line[start];
+        var expression = (ExpressionToken)line[start];
         short label = _evaluator.EvaluateExpression(expression.Components);
         if ((!_program.TryGetValue(label, out var instruction)) || (!instruction.isLabeled))
         { throw new RuntimeException($"Label {label} does not exist"); }
@@ -286,8 +288,8 @@ public class TinyBasicEnvironment
                 continue;
             }
 
-            List<ExpressionTinyBasicToken> input = RequestInput();
-            foreach (ExpressionTinyBasicToken expression in input)
+            List<ExpressionToken> input = RequestInput();
+            foreach (ExpressionToken expression in input)
             {
                 try
                 { value = _evaluator.EvaluateExpression(expression.Components); }
@@ -301,14 +303,14 @@ public class TinyBasicEnvironment
         }
     }
 
-    private List<ExpressionTinyBasicToken> RequestInput()
+    private List<ExpressionToken> RequestInput()
     {
         Console.WriteLine('?');
         string? input = Console.ReadLine();
         if (string.IsNullOrEmpty(input))
         { return []; }
         
-        List<ExpressionTinyBasicToken> expressions = new();
+        List<ExpressionToken> expressions = new();
         var lexer = new Lexer(input);
         TinyBasicToken[] tokens;
         try
@@ -322,7 +324,7 @@ public class TinyBasicEnvironment
         int pointer = 0;
         while (pointer < tokens.Length)
         {
-            ExpressionTinyBasicToken expression = ParsingUtils.SelectExpressionFromLine(tokens, ref pointer);
+            ExpressionToken expression = ParsingUtils.SelectExpressionFromLine(tokens, ref pointer);
             try
             { ParsingUtils.ParseExpression(expression); }
             catch (ParsingException ex)
@@ -337,25 +339,25 @@ public class TinyBasicEnvironment
     private string ExpressionListToString(TinyBasicToken[] line)
     {
         var builder = new StringBuilder();
-        int pointer = line[0].Type is TBTokenType.Number ? 2 : 1;
+        int pointer = line[0].Type is TokenType.Number ? 2 : 1;
         while (pointer < line.Length)
         {
             TinyBasicToken token = line[pointer];
             switch (token.Type)
             {
-                case TBTokenType.Comma:
+                case TokenType.Comma:
                 {
                     ++pointer;
                     continue;
                 }
-                case TBTokenType.QuotedString:
+                case TokenType.QuotedString:
                 {
                     builder.Append(token);
                     break;
                 }
                 default:
                 {
-                    builder.Append(_evaluator.EvaluateExpression(((ExpressionTinyBasicToken)token).Components));
+                    builder.Append(_evaluator.EvaluateExpression(((ExpressionToken)token).Components));
                     break;
                 }
             }
@@ -368,12 +370,12 @@ public class TinyBasicEnvironment
     {
         return op.Type switch
         {
-            TBTokenType.OperatorGreaterThan => value1 > value2,
-            TBTokenType.OperatorGreaterThanOrEqual => value1 >= value2,
-            TBTokenType.OperatorLessThan => value1 < value2,
-            TBTokenType.OperatorLessThanOrEqual => value1 <= value2,
-            TBTokenType.OperatorEquals => value1 == value2,
-            TBTokenType.OperatorNotEqual => value1 != value2,
+            TokenType.OperatorGreaterThan => value1 > value2,
+            TokenType.OperatorGreaterThanOrEqual => value1 >= value2,
+            TokenType.OperatorLessThan => value1 < value2,
+            TokenType.OperatorLessThanOrEqual => value1 <= value2,
+            TokenType.OperatorEquals => value1 == value2,
+            TokenType.OperatorNotEqual => value1 != value2,
             _ => throw new Exception("Unknown operator") // will be caught by parser, exists just to close default case
         };
     }

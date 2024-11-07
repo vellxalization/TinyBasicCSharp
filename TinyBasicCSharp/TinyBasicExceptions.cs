@@ -10,10 +10,10 @@ public class UnmatchedQuotationException : TokenizationException
     public UnmatchedQuotationException(string message) : base(message) {}
 }
 
-public class UnknownCharacterException : TokenizationException
-{
-    public UnknownCharacterException(string message) : base(message) {}
-}
+// public class UnknownCharacterException : TokenizationException
+// {
+//     public UnknownCharacterException(string message) : base(message) {}
+// }
 
 public class ParsingException : Exception
 {

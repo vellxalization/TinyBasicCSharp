@@ -8,43 +8,43 @@ namespace TinyCompilerForTinyBasic.Tokenization;
 public class TinyBasicToken
 {
     public TinyBasicToken(){}
-    public TinyBasicToken(TBTokenType type) => Type = type;
+    public TinyBasicToken(TokenType type) => Type = type;
     
-    public TBTokenType Type { get; init; } = TBTokenType.Unknown;
+    public TokenType Type { get; init; } = TokenType.Unknown;
 
     public override string ToString()
     {
         switch (Type)
         {
-            case TBTokenType.Unknown:
+            case TokenType.Unknown:
             { return "UNKNOWN"; }
-            case TBTokenType.Comma:
+            case TokenType.Comma:
             { return ","; }
-            case TBTokenType.NewLine:
+            case TokenType.NewLine:
             { return "\n"; }
-            case TBTokenType.OperatorPlus:
+            case TokenType.OperatorPlus:
             { return "+"; }
-            case TBTokenType.OperatorMinus:
+            case TokenType.OperatorMinus:
             { return "-"; }
-            case TBTokenType.OperatorMultiplication:
+            case TokenType.OperatorMultiplication:
             { return "*"; }
-            case TBTokenType.OperatorDivision:
+            case TokenType.OperatorDivision:
             { return "/"; }
-            case TBTokenType.OperatorGreaterThan:
+            case TokenType.OperatorGreaterThan:
             { return ">"; }
-            case TBTokenType.OperatorGreaterThanOrEqual:
+            case TokenType.OperatorGreaterThanOrEqual:
             { return ">="; }
-            case TBTokenType.OperatorLessThan:
+            case TokenType.OperatorLessThan:
             { return "<"; }
-            case TBTokenType.OperatorLessThanOrEqual:
+            case TokenType.OperatorLessThanOrEqual:
             { return "<="; }
-            case TBTokenType.OperatorEquals:
+            case TokenType.OperatorEquals:
             { return "="; }
-            case TBTokenType.OperatorNotEqual:
+            case TokenType.OperatorNotEqual:
             { return "<>"; }
-            case TBTokenType.ParenthesisOpen:
+            case TokenType.ParenthesisOpen:
             { return "("; }
-            case TBTokenType.ParenthesisClose:
+            case TokenType.ParenthesisClose:
             { return ")"; }
             default:
             { return base.ToString()!; }
@@ -55,10 +55,10 @@ public class TinyBasicToken
 /// <summary>
 /// TinyBasic token for storing variable values, such as strings and numbers
 /// </summary>
-public class ValueTinyBasicToken : TinyBasicToken
+public class ValueToken : TinyBasicToken
 {
-    public ValueTinyBasicToken(){}
-    public ValueTinyBasicToken(TBTokenType type, string value) : base(type) => Value = value;
+    public ValueToken(){}
+    public ValueToken(TokenType type, string value) : base(type) => Value = value;
     
     public string Value { get; init; } = string.Empty;
 
@@ -68,10 +68,10 @@ public class ValueTinyBasicToken : TinyBasicToken
 /// <summary>
 /// TinyBasic token for storing expressions (a sequence of numbers, operators and variables)
 /// </summary>
-public class ExpressionTinyBasicToken : TinyBasicToken
+public class ExpressionToken : TinyBasicToken
 {
-    public ExpressionTinyBasicToken() : base(TBTokenType.Expression) { }
-    public ExpressionTinyBasicToken(TinyBasicToken[] tokens) : this() => Components = tokens;
+    public ExpressionToken() : base(TokenType.Expression) { }
+    public ExpressionToken(TinyBasicToken[] tokens) : this() => Components = tokens;
     public TinyBasicToken[] Components { get; init; } = [];
 
     public override string ToString()
@@ -80,21 +80,21 @@ public class ExpressionTinyBasicToken : TinyBasicToken
 
         foreach (TinyBasicToken token in Components)
         {
-            if (token.Type is TBTokenType.ParenthesisClose) // remove space before ')'
-            { builder.Remove(builder.Length - 1, 1); }
+            // if (token.Type is TBTokenType.ParenthesisClose) // remove space before ')'
+            // { builder.Remove(builder.Length - 1, 1); }
             
             builder.Append(token);
             
-            if (token.Type is not TBTokenType.ParenthesisOpen) // not adding space after '('
-            { builder.Append(' '); }
+            // if (token.Type is not TBTokenType.ParenthesisOpen) // not adding space after '('
+            // { builder.Append(' '); }
         }
         
-        builder.Remove(builder.Length - 1, 1);
+        // builder.Remove(builder.Length - 1, 1);
         return builder.ToString();
     }
 }
 
-public enum TBTokenType
+public enum TokenType
 {
     Unknown,
     Comma,

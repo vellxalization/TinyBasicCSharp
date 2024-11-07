@@ -32,12 +32,12 @@ public class ExpressionEvaluator
         while ((start + 1) < expression.Length)
         {
             TinyBasicToken op = expression[start + 1];
-            if (op.Type is not (TBTokenType.OperatorPlus or TBTokenType.OperatorMinus))
+            if (op.Type is not (TokenType.OperatorPlus or TokenType.OperatorMinus))
             { break; }
 
             start += 2;
             int secondValue = EvaluateTerm(expression, ref start);
-            value = op.Type is TBTokenType.OperatorPlus ? unchecked((short)(value + secondValue)) : unchecked((short)(value - secondValue));
+            value = op.Type is TokenType.OperatorPlus ? unchecked((short)(value + secondValue)) : unchecked((short)(value - secondValue));
         }
         return unchecked((short)value);
     }
@@ -49,13 +49,13 @@ public class ExpressionEvaluator
         while ((start + 1) < expression.Length)
         {
             TinyBasicToken op = expression[start + 1];
-            if (op.Type is not (TBTokenType.OperatorDivision or TBTokenType.OperatorMultiplication))
+            if (op.Type is not (TokenType.OperatorDivision or TokenType.OperatorMultiplication))
             { break; }
             
             start += 2;
             short secondValue = EvaluateFactor(expression, ref start);
             
-            if (op.Type is TBTokenType.OperatorMultiplication)
+            if (op.Type is TokenType.OperatorMultiplication)
             { value = unchecked((short)(value * secondValue)); } 
             else
             {
@@ -74,23 +74,23 @@ public class ExpressionEvaluator
         TinyBasicToken token = expression[start];
         switch (token.Type)
         {
-            case TBTokenType.OperatorMinus:
+            case TokenType.OperatorMinus:
             {
                 shouldNegate = !shouldNegate;
                 ++start;
                 goto res;
             }
-            case TBTokenType.OperatorPlus:
+            case TokenType.OperatorPlus:
             {
                 ++start;
                 goto res;
             }
-            case TBTokenType.Number:
+            case TokenType.Number:
             {
                 int value = int.Parse(token.ToString());
                 return shouldNegate ? unchecked((short)-value) : unchecked((short)value);
             }
-            case TBTokenType.String:
+            case TokenType.String:
             {
                 char address = char.Parse(token.ToString());
                 short? value = _memory.ReadVariable(address);
@@ -99,7 +99,7 @@ public class ExpressionEvaluator
 
                 return (short)(shouldNegate ? -value.Value : value.Value);
             }
-            case TBTokenType.ParenthesisOpen:
+            case TokenType.ParenthesisOpen:
             {
                 ++start;
                 short value = EvaluateExpression(expression, ref start);

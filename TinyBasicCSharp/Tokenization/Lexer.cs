@@ -15,7 +15,6 @@ public class Lexer
     /// Tokenizes input from constructor
     /// </summary>
     /// <returns>An array of TinyBasic tokens</returns>
-    /// <exception cref="UnknownCharacterException">Unknown character has occurred during tokenization</exception>
     /// <exception cref="UnmatchedQuotationException">End of input reached without closing quote</exception>
     public TinyBasicToken[] Tokenize()
     {
@@ -27,14 +26,14 @@ public class Lexer
 
             if (current is '\n')
             {
-                tokens.Add(new TinyBasicToken(TBTokenType.NewLine));
+                tokens.Add(new TinyBasicToken(TokenType.NewLine));
                 ++_pointer;
             }
             else if (char.IsWhiteSpace(current))
             { ++_pointer; }
             else if (current is ',')
             {
-                tokens.Add(new TinyBasicToken(TBTokenType.Comma));
+                tokens.Add(new TinyBasicToken(TokenType.Comma));
                 ++_pointer;
             }
             else if (current is '"')
@@ -50,10 +49,8 @@ public class Lexer
             }
             else if (char.IsDigit(current))
             { tokens.Add(ReadNumber()); }
-            else if (char.IsLetter(current))
+            else 
             { tokens.Add(ReadString()); }
-            else
-            { throw new UnknownCharacterException($"Unknown character while tokenizing input: '{current}'"); }
         }
 
         return tokens.ToArray();
@@ -66,7 +63,7 @@ public class Lexer
     /// </summary>
     /// <returns>Value token with quoted string</returns>
     /// <exception cref="UnmatchedQuotationException">End of input reached without closing quote</exception>
-    private ValueTinyBasicToken ReadQuotedString()
+    private ValueToken ReadQuotedString()
     {
         int pointerCopy = _pointer;
 
@@ -79,63 +76,62 @@ public class Lexer
             // break from the loop if we've found closing quotation mark, new line OR reached the end of source code
             ++_pointer;
         }
+
+        string quotedString = _sourceCode.Substring(pointerCopy, _pointer - pointerCopy);
         if ((_pointer >= _sourceCode.Length) || (currentChar is '\n' or '\r'))
-        { throw new UnmatchedQuotationException($"Failed to find closing quotation mark for: {_sourceCode.Substring(pointerCopy, _pointer - pointerCopy)}"); }
+        { throw new UnmatchedQuotationException($"Failed to find closing quotation mark for: {quotedString}"); }
         
-        return new ValueTinyBasicToken(TBTokenType.QuotedString, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
+        return new ValueToken(TokenType.QuotedString, quotedString);
     }
     
     /// <summary>
     /// Used to read numbers.
-    /// Stops at the first letter or newline
+    /// Stops at the first letter or space/newline
     /// </summary>
     /// <returns>Value token with number</returns>
-    private ValueTinyBasicToken ReadNumber()
+    private ValueToken ReadNumber()
     {
-        var builder = new StringBuilder();
-        
+        int pointerCopy = _pointer;
         while (_pointer < _sourceCode.Length)
         {
             char currentChar = _sourceCode[_pointer];
-            if (currentChar is ' ') 
-            {
-                // numbers with spaces between digits are allowed, so we skip any spaces
-                ++_pointer;
-                continue;
-            }
+            // if (currentChar is ' ') 
+            // {
+            //     // numbers with spaces between digits are allowed, so we skip any spaces
+            //     ++_pointer;
+            //     continue;
+            // }
 
             if (char.IsDigit(currentChar))
-            {
-                builder.Append(currentChar);
-                ++_pointer;
-            }
+            { ++_pointer; }
             else
             { break; }
             // break from the loop if we've encountered a non-digit OR reached the end of source code
         }
         
-        return new ValueTinyBasicToken(TBTokenType.Number, builder.ToString());
+        return new ValueToken(TokenType.Number, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
     }
 
     /// <summary>
     /// Used to read strings such as variables and keywords.
     /// Stops at the first non-letter character
+    /// Any non-reserved symbol (such as '\' or '?') will be treated as string or part of it
     /// </summary>
     /// <returns>Value token with string</returns>
-    private ValueTinyBasicToken ReadString()
+    private ValueToken ReadString()
     {
         int pointerCopy = _pointer;
         
         while (_pointer < _sourceCode.Length)
         {
             char currentChar = _sourceCode[_pointer];
-            if (!char.IsLetter(currentChar))
+            if (char.IsWhiteSpace(currentChar) || currentChar is '"' or '(' or ')' or '+' or '-' or '*' or '/' or '<' or '>' or '=' or ',')
             { break; } 
-            // break from the loop if character is not letter OR reached the end of source code
+            
             ++_pointer;
         }
         
-        return new ValueTinyBasicToken(TBTokenType.String, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
+        return new ValueToken(TokenType.String, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
     }
     
     /// <summary>
@@ -147,57 +143,57 @@ public class Lexer
         switch (_sourceCode[_pointer])
         {
             case '(':
-            { return new TinyBasicToken(TBTokenType.ParenthesisOpen); }
+            { return new TinyBasicToken(TokenType.ParenthesisOpen); }
             case ')':
-            { return new TinyBasicToken(TBTokenType.ParenthesisClose); }
+            { return new TinyBasicToken(TokenType.ParenthesisClose); }
             case '+':
-            { return new TinyBasicToken(TBTokenType.OperatorPlus); }
+            { return new TinyBasicToken(TokenType.OperatorPlus); }
             case '-':
-            { return new TinyBasicToken(TBTokenType.OperatorMinus); }
+            { return new TinyBasicToken(TokenType.OperatorMinus); }
             case '*':
-            { return new TinyBasicToken(TBTokenType.OperatorMultiplication); }
+            { return new TinyBasicToken(TokenType.OperatorMultiplication); }
             case '/':
-            { return new TinyBasicToken(TBTokenType.OperatorDivision); }
+            { return new TinyBasicToken(TokenType.OperatorDivision); }
             case '=':
-            { return new TinyBasicToken(TBTokenType.OperatorEquals); }
+            { return new TinyBasicToken(TokenType.OperatorEquals); }
             case '>':
             {
                 if (((_pointer + 1) >= _sourceCode.Length))
-                { return new TinyBasicToken(TBTokenType.OperatorGreaterThan); }
+                { return new TinyBasicToken(TokenType.OperatorGreaterThan); }
 
                 char nextChar = _sourceCode[_pointer + 1];
                 switch (nextChar)
                 {
                     case '<':
                         ++_pointer;
-                        return new TinyBasicToken(TBTokenType.OperatorNotEqual);
+                        return new TinyBasicToken(TokenType.OperatorNotEqual);
                     case '=':
                         ++_pointer;
-                        return new TinyBasicToken(TBTokenType.OperatorGreaterThanOrEqual);
+                        return new TinyBasicToken(TokenType.OperatorGreaterThanOrEqual);
                     default:
-                        return new TinyBasicToken(TBTokenType.OperatorGreaterThan);
+                        return new TinyBasicToken(TokenType.OperatorGreaterThan);
                 }
             }
             case '<':
             {
                 if (((_pointer + 1) >= _sourceCode.Length))
-                { return new TinyBasicToken(TBTokenType.OperatorLessThan); }
+                { return new TinyBasicToken(TokenType.OperatorLessThan); }
 
                 char nextChar = _sourceCode[_pointer + 1];
                 switch (nextChar)
                 {
                     case '>':
                         ++_pointer;
-                        return new TinyBasicToken(TBTokenType.OperatorNotEqual);
+                        return new TinyBasicToken(TokenType.OperatorNotEqual);
                     case '=':
                         ++_pointer;
-                        return new TinyBasicToken(TBTokenType.OperatorLessThanOrEqual);
+                        return new TinyBasicToken(TokenType.OperatorLessThanOrEqual);
                     default:
-                        return new TinyBasicToken(TBTokenType.OperatorLessThan);
+                        return new TinyBasicToken(TokenType.OperatorLessThan);
                 }
             }
             default: // shouldn't ever get here; exists just to close default switch statement
-            { throw new UnknownCharacterException($"Unexpected operator: {_sourceCode[_pointer]}"); } 
+            { throw new TokenizationException($"Unexpected operator: {_sourceCode[_pointer]}"); } 
         }
     }
 }

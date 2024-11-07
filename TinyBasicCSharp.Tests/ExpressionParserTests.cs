@@ -48,103 +48,103 @@ public class ExpressionParserTests
         ParsingUtils.ParseExpression(GetValidExpression(index));
     }
 
-    private ExpressionTinyBasicToken GetValidExpression(int index)
+    private ExpressionToken GetValidExpression(int index)
     {
         return index switch
         {
-            0 => new ExpressionTinyBasicToken() // X
-                { Components = [new ValueTinyBasicToken(TBTokenType.String, "X")] },
-            1 => new ExpressionTinyBasicToken() // (X)
-                { Components = [new TinyBasicToken(TBTokenType.ParenthesisOpen), new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.ParenthesisClose)] },
-            2 => new ExpressionTinyBasicToken() // (-X)
+            0 => new ExpressionToken() // X
+                { Components = [new ValueToken(TokenType.String, "X")] },
+            1 => new ExpressionToken() // (X)
+                { Components = [new TinyBasicToken(TokenType.ParenthesisOpen), new ValueToken(TokenType.String, "X"), new TinyBasicToken(TokenType.ParenthesisClose)] },
+            2 => new ExpressionToken() // (-X)
                 { Components = 
                 [
-                    new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus),
-                    new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.ParenthesisClose)
+                    new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus),
+                    new ValueToken(TokenType.String, "X"), new TinyBasicToken(TokenType.ParenthesisClose)
                 ] },
-            3 => new ExpressionTinyBasicToken() // (---X)
+            3 => new ExpressionToken() // (---X)
             { Components = 
             [
-                new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus),
-                new TinyBasicToken(TBTokenType.OperatorMinus), new TinyBasicToken(TBTokenType.OperatorMinus),
-                new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.ParenthesisClose)
+                new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus),
+                new TinyBasicToken(TokenType.OperatorMinus), new TinyBasicToken(TokenType.OperatorMinus),
+                new ValueToken(TokenType.String, "X"), new TinyBasicToken(TokenType.ParenthesisClose)
             ] },
-            4 => new ExpressionTinyBasicToken() // ((-X + (-100)))
+            4 => new ExpressionToken() // ((-X + (-100)))
             { Components = 
             [
-                new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus),
-                new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus), new TinyBasicToken(TBTokenType.ParenthesisOpen),
-                new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.Number, "100"), new TinyBasicToken(TBTokenType.ParenthesisClose),
-                new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose)
+                new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus),
+                new ValueToken(TokenType.String, "X"), new TinyBasicToken(TokenType.OperatorPlus), new TinyBasicToken(TokenType.ParenthesisOpen),
+                new TinyBasicToken(TokenType.OperatorMinus), new ValueToken(TokenType.Number, "100"), new TinyBasicToken(TokenType.ParenthesisClose),
+                new TinyBasicToken(TokenType.ParenthesisClose), new TinyBasicToken(TokenType.ParenthesisClose)
             ] },
-            5 => new ExpressionTinyBasicToken() // ((-X + 100 * (100 + Y * (124 - (24)))))
+            5 => new ExpressionToken() // ((-X + 100 * (100 + Y * (124 - (24)))))
             { Components = 
                 [
-                    new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus),
-                    new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus),  
-                    new ValueTinyBasicToken(TBTokenType.Number, "100"), new TinyBasicToken(TBTokenType.OperatorMultiplication), new TinyBasicToken(TBTokenType.ParenthesisOpen), 
-                    new ValueTinyBasicToken(TBTokenType.Number, "100"), new TinyBasicToken(TBTokenType.OperatorPlus), new ValueTinyBasicToken(TBTokenType.String, "Y"),
-                    new TinyBasicToken(TBTokenType.OperatorMultiplication), new TinyBasicToken(TBTokenType.ParenthesisOpen), new ValueTinyBasicToken(TBTokenType.Number, "124"),
-                    new TinyBasicToken(TBTokenType.OperatorMinus), new TinyBasicToken(TBTokenType.ParenthesisOpen), new ValueTinyBasicToken(TBTokenType.Number, "24"),
-                    new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose), 
-                    new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose)
+                    new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus),
+                    new ValueToken(TokenType.String, "X"), new TinyBasicToken(TokenType.OperatorPlus),  
+                    new ValueToken(TokenType.Number, "100"), new TinyBasicToken(TokenType.OperatorMultiplication), new TinyBasicToken(TokenType.ParenthesisOpen), 
+                    new ValueToken(TokenType.Number, "100"), new TinyBasicToken(TokenType.OperatorPlus), new ValueToken(TokenType.String, "Y"),
+                    new TinyBasicToken(TokenType.OperatorMultiplication), new TinyBasicToken(TokenType.ParenthesisOpen), new ValueToken(TokenType.Number, "124"),
+                    new TinyBasicToken(TokenType.OperatorMinus), new TinyBasicToken(TokenType.ParenthesisOpen), new ValueToken(TokenType.Number, "24"),
+                    new TinyBasicToken(TokenType.ParenthesisClose), new TinyBasicToken(TokenType.ParenthesisClose), new TinyBasicToken(TokenType.ParenthesisClose), 
+                    new TinyBasicToken(TokenType.ParenthesisClose), new TinyBasicToken(TokenType.ParenthesisClose)
                 ]
             },
-            6 => new ExpressionTinyBasicToken() // -X + -10 
+            6 => new ExpressionToken() // -X + -10 
             { Components = 
                 [
-                    new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus),
-                    new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.Number, "10")
+                    new TinyBasicToken(TokenType.OperatorMinus), new ValueToken(TokenType.String, "X"), new TinyBasicToken(TokenType.OperatorPlus),
+                    new TinyBasicToken(TokenType.OperatorMinus), new ValueToken(TokenType.Number, "10")
                 ]
             },
-            _ => new ExpressionTinyBasicToken()
+            _ => new ExpressionToken()
         };
     }
     
-    private ExpressionTinyBasicToken GetInvalidExpression(int index)
+    private ExpressionToken GetInvalidExpression(int index)
     {
         return index switch
         {
-            0 => new ExpressionTinyBasicToken() // 10 + XyZ
-                { Components = [new ValueTinyBasicToken(TBTokenType.Number, "10"), new TinyBasicToken(TBTokenType.OperatorPlus), new ValueTinyBasicToken(TBTokenType.String, "XyZ")]},
-            1 => new ExpressionTinyBasicToken()  // ()
-                { Components = [new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.ParenthesisClose)] },
-            2 => new ExpressionTinyBasicToken() // (-)
-                { Components = [new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), new TinyBasicToken(TBTokenType.ParenthesisClose)] },
-            3 => new ExpressionTinyBasicToken() // (-X
-                { Components = [new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.String, "X")] },
-            4 => new ExpressionTinyBasicToken() // (-X))
+            0 => new ExpressionToken() // 10 + XyZ
+                { Components = [new ValueToken(TokenType.Number, "10"), new TinyBasicToken(TokenType.OperatorPlus), new ValueToken(TokenType.String, "XyZ")]},
+            1 => new ExpressionToken()  // ()
+                { Components = [new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.ParenthesisClose)] },
+            2 => new ExpressionToken() // (-)
+                { Components = [new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus), new TinyBasicToken(TokenType.ParenthesisClose)] },
+            3 => new ExpressionToken() // (-X
+                { Components = [new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus), new ValueToken(TokenType.String, "X")] },
+            4 => new ExpressionToken() // (-X))
             {
-                Components = [new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.String, "X"),
-                new TinyBasicToken(TBTokenType.ParenthesisClose), new TinyBasicToken(TBTokenType.ParenthesisClose)]
+                Components = [new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus), new ValueToken(TokenType.String, "X"),
+                new TinyBasicToken(TokenType.ParenthesisClose), new TinyBasicToken(TokenType.ParenthesisClose)]
             },
-            5 => new ExpressionTinyBasicToken() // (-X +
+            5 => new ExpressionToken() // (-X +
                 { Components = 
                 [
-                    new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), 
-                    new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorPlus)
+                    new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus), 
+                    new ValueToken(TokenType.String, "X"), new TinyBasicToken(TokenType.OperatorPlus)
                 ] },
-            6 => new ExpressionTinyBasicToken() // -X - -
+            6 => new ExpressionToken() // -X - -
             { Components = 
             [
-                new TinyBasicToken(TBTokenType.OperatorMinus), new ValueTinyBasicToken(TBTokenType.String, "X"), 
-                new TinyBasicToken(TBTokenType.OperatorMinus), new TinyBasicToken(TBTokenType.OperatorMinus)
+                new TinyBasicToken(TokenType.OperatorMinus), new ValueToken(TokenType.String, "X"), 
+                new TinyBasicToken(TokenType.OperatorMinus), new TinyBasicToken(TokenType.OperatorMinus)
             ] },
-            7 => new ExpressionTinyBasicToken() // (-X 2)
+            7 => new ExpressionToken() // (-X 2)
                 { Components = 
                 [
-                    new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), 
-                    new ValueTinyBasicToken(TBTokenType.String, "X"), new ValueTinyBasicToken(TBTokenType.Number, "2"),
-                    new TinyBasicToken(TBTokenType.ParenthesisClose)
+                    new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus), 
+                    new ValueToken(TokenType.String, "X"), new ValueToken(TokenType.Number, "2"),
+                    new TinyBasicToken(TokenType.ParenthesisClose)
                 ] },
-            8 => new ExpressionTinyBasicToken() // (-X <> 2)
+            8 => new ExpressionToken() // (-X <> 2)
                 { Components = 
                 [
-                    new TinyBasicToken(TBTokenType.ParenthesisOpen), new TinyBasicToken(TBTokenType.OperatorMinus), 
-                    new ValueTinyBasicToken(TBTokenType.String, "X"), new TinyBasicToken(TBTokenType.OperatorNotEqual), 
-                    new ValueTinyBasicToken(TBTokenType.Number, "2"), new TinyBasicToken(TBTokenType.ParenthesisClose)
+                    new TinyBasicToken(TokenType.ParenthesisOpen), new TinyBasicToken(TokenType.OperatorMinus), 
+                    new ValueToken(TokenType.String, "X"), new TinyBasicToken(TokenType.OperatorNotEqual), 
+                    new ValueToken(TokenType.Number, "2"), new TinyBasicToken(TokenType.ParenthesisClose)
                 ] },
-            _ => new ExpressionTinyBasicToken(),
+            _ => new ExpressionToken(),
         };
     }
 }

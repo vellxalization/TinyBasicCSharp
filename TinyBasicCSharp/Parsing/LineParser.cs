@@ -24,7 +24,7 @@ public class LineParser
         error = null;
         
         TinyBasicToken token = _tokens[_pointer];
-        if (token.Type is TBTokenType.NewLine)
+        if (token.Type is TokenType.NewLine)
         {
             ++_pointer;
             result = [token];
@@ -33,7 +33,7 @@ public class LineParser
         
         List<TinyBasicToken?> line = new();
         TinyBasicToken? next;
-        if (token.Type is TBTokenType.Number)
+        if (token.Type is TokenType.Number)
         {
             int value = int.Parse(token.ToString());
             if (value is < 0 or > short.MaxValue)
@@ -45,18 +45,13 @@ public class LineParser
             line.Add(token);    
 
             next = Peek();
-            if (next is null)
-            {
-                result = line.ToArray()!;
-                return true;
-            } 
-            
-            if (next.Type is TBTokenType.NewLine)
+            if (next is null || next.Type is TokenType.Number)
             {
                 _pointer += 2;
                 result = line.ToArray()!;
                 return true;
-            }
+            } 
+            
             ++_pointer;
         }
 
@@ -70,7 +65,7 @@ public class LineParser
         }
         
         next = Peek();
-        if (next is null || next.Type is TBTokenType.NewLine)
+        if (next is null || next.Type is TokenType.NewLine)
         {
             _pointer += 2;
             result = line.ToArray()!;
@@ -88,6 +83,7 @@ public class LineParser
     //     INPUT var-list
     //     LET var = expression
     //     GOSUB expression
+    //     REM string
     //     RETURN
     //     CLEAR
     //     LIST
@@ -101,6 +97,21 @@ public class LineParser
         string value = token.ToString();
         switch (value)
         {
+            case "REM":
+            {
+                StringBuilder builder = new();
+                TinyBasicToken? next = Peek();
+                while (next is not null && next.Type is not TokenType.NewLine)
+                {
+                    builder.Append(next);
+                    builder.Append(' ');
+                    ++_pointer;
+                    next = Peek();
+                }
+                builder.Remove(builder.Length - 1, 1);
+                lineToModify.Add(new ValueToken(TokenType.QuotedString, builder.ToString()));
+                return;
+            }
             case "PRINT":
             {
                 if (Peek() is null)
@@ -108,7 +119,7 @@ public class LineParser
                 
                 ++_pointer;
                 ParseExprList(lineToModify);
-                break;
+                return;
             }
             case "IF":
                 if (Peek() is null)
@@ -116,7 +127,7 @@ public class LineParser
                 
                 ++_pointer;
                 ParseIf(lineToModify);
-                break;
+                return;
             case "GOSUB":
             case "GOTO":
             {
@@ -124,7 +135,7 @@ public class LineParser
                 { throw new UnexpectedOrEmptyTokenException($"Expected an expression after {value} keyword at \"{LineToString(lineToModify)}\""); }
 
                 ++_pointer;
-                ExpressionTinyBasicToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
+                ExpressionToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
                 try
                 { ParsingUtils.ParseExpression(expression); }
                 catch (ParsingException ex)
@@ -163,7 +174,7 @@ public class LineParser
 
     private void ParseIf(List<TinyBasicToken?> lineToModify)
     {
-        ExpressionTinyBasicToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
+        ExpressionToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
         try
         { ParsingUtils.ParseExpression(expression); }
         catch (ParsingException ex)
@@ -172,9 +183,9 @@ public class LineParser
 
         TinyBasicToken? next = Peek();
         lineToModify.Add(next);
-        if (next?.Type is not (TBTokenType.OperatorGreaterThan or TBTokenType.OperatorLessThan
-            or TBTokenType.OperatorGreaterThanOrEqual or TBTokenType.OperatorLessThanOrEqual
-            or TBTokenType.OperatorEquals or TBTokenType.OperatorNotEqual))
+        if (next?.Type is not (TokenType.OperatorGreaterThan or TokenType.OperatorLessThan
+            or TokenType.OperatorGreaterThanOrEqual or TokenType.OperatorLessThanOrEqual
+            or TokenType.OperatorEquals or TokenType.OperatorNotEqual))
         { throw new UnexpectedOrEmptyTokenException($"Expected an operator after expression at \"{LineToString(lineToModify)}\""); }
         
         ++_pointer;
@@ -206,11 +217,11 @@ public class LineParser
     private void ParseExprList(List<TinyBasicToken?> lineToModify)
     {
         TinyBasicToken token = _tokens[_pointer];
-        if (token.Type is TBTokenType.QuotedString)
+        if (token.Type is TokenType.QuotedString)
         { lineToModify.Add(token); }
         else
         {
-            ExpressionTinyBasicToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
+            ExpressionToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
             try
             { ParsingUtils.ParseExpression(expression); }
             catch (ParsingException ex)
@@ -219,7 +230,7 @@ public class LineParser
         }
         
         TinyBasicToken? next = Peek();
-        while (next?.Type is TBTokenType.Comma)
+        while (next?.Type is TokenType.Comma)
         {
             lineToModify.Add(next);
             
@@ -229,11 +240,11 @@ public class LineParser
             
             ++_pointer;
             token = _tokens[_pointer];
-            if (token.Type is TBTokenType.QuotedString)
+            if (token.Type is TokenType.QuotedString)
             { lineToModify.Add(token); }
             else
             {
-                ExpressionTinyBasicToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
+                ExpressionToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
                 try
                 { ParsingUtils.ParseExpression(expression); }
                 catch (ParsingException ex)
@@ -252,7 +263,7 @@ public class LineParser
         { throw new InvalidVariableNameException($"Expected a valid variable name at \"{LineToString(lineToModify)}\""); }
 
         TinyBasicToken? next = Peek();
-        while (next?.Type is TBTokenType.Comma)
+        while (next?.Type is TokenType.Comma)
         {
             lineToModify.Add(next);
             
@@ -276,7 +287,7 @@ public class LineParser
         
         TinyBasicToken? next = Peek();
         lineToModify.Add(next);
-        if (next?.Type is not TBTokenType.OperatorEquals)
+        if (next?.Type is not TokenType.OperatorEquals)
         { throw new UnexpectedOrEmptyTokenException($"Expected an assignment operator after variable name at \"{LineToString(lineToModify)}\""); }
         ++_pointer;
         
@@ -285,7 +296,7 @@ public class LineParser
         { throw new UnexpectedOrEmptyTokenException($"Expected an expression after assignment operator at \"{LineToString(lineToModify)}\""); }
         ++_pointer;
         
-        ExpressionTinyBasicToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
+        ExpressionToken expression = ParsingUtils.SelectExpressionFromLine(_tokens, ref _pointer);
         try
         { ParsingUtils.ParseExpression(expression); }
         catch (ParsingException ex)
