@@ -45,7 +45,7 @@ public class LineParser
             line.Add(token);    
 
             next = Peek();
-            if (next is null || next.Type is TokenType.Number)
+            if (next is null || next.Type is TokenType.NewLine)
             {
                 _pointer += 2;
                 result = line.ToArray()!;
@@ -108,7 +108,6 @@ public class LineParser
                     ++_pointer;
                     next = Peek();
                 }
-                builder.Remove(builder.Length - 1, 1);
                 lineToModify.Add(new ValueToken(TokenType.QuotedString, builder.ToString()));
                 return;
             }

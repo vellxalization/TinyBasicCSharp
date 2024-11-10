@@ -14,8 +14,8 @@ public class TinyBasicEnvironment
     private bool _isRunning = false;
     private int _lineKeyIndex = 0;
     
+    private Stack<int> _returnStack = new();
     private Queue<short> _inputQueue = new();
-    private Queue<int> _returnQueue = new();
     
     public TinyBasicEnvironment()
     {
@@ -46,25 +46,20 @@ public class TinyBasicEnvironment
         }
     
         var parser = new LineParser(tokens);
-        int pointer = 1;
+        _lineKeyIndex = 1;
         while (parser.CanReadLine())
         {
             if (!parser.ParseLine(out TinyBasicToken[] line, out string? error))
             {
-                int lineNumber = (line.Length > 0 && line[0].Type is TokenType.Number) ? int.Parse(line[0].ToString()) : pointer;
+                int lineNumber = (line.Length > 0 && line[0].Type is TokenType.Number) ? int.Parse(line[0].ToString()) : _lineKeyIndex;
                 Console.WriteLine($"Line {lineNumber}: Syntax error: {error}");
                 return;
             }
 
-            if (line[0].Type is not TokenType.Number)
-            {
-                AddToProgram(line, pointer++, false);
-                continue;
-            }
+            if (line.Length is 0 || line[0].Type is TokenType.NewLine)
+            { continue; }
             
-            int label = int.Parse(line[0].ToString());
-            AddToProgram(line, label++, true);
-            pointer = label > pointer ? label : pointer;
+            UpdateProgram(line, line[0].Type is TokenType.Number);
         }
 
         ExecuteProgram();
@@ -82,6 +77,9 @@ public class TinyBasicEnvironment
             return;
         }
         
+        if (tokens.Length == 0 || tokens[0].Type is TokenType.NewLine)
+        { return; }
+        
         LineParser parser = new(tokens);
         if (!parser.ParseLine(out TinyBasicToken[] parsedLine, out string? error))
         {
@@ -89,11 +87,7 @@ public class TinyBasicEnvironment
             return;
         }
 
-        if (parsedLine[0].Type is TokenType.Number)
-        {
-            AddToProgram(parsedLine, int.Parse(parsedLine[0].ToString()), true);
-            return;
-        }
+        UpdateProgram(parsedLine, parsedLine[0].Type is TokenType.Number);
 
         try
         { ExecuteLine(parsedLine); }
@@ -101,29 +95,28 @@ public class TinyBasicEnvironment
         { Console.WriteLine($"Runtime error: {ex.Message}"); }
     }
     
-    private void AddToProgram(TinyBasicToken[] line, int position, bool isLabeled)
+    private void UpdateProgram(TinyBasicToken[] line, bool isLabeled)
     {
         if (!isLabeled)
         {
-            if (!_program.TryAdd(position, (line, false)))
-            { _program[position] = (line, false); }
-
-            return;
-        }
-
-        if (line.Length < 2)
-        {
-            _program.Remove(position);
-            return;
-        }
-
-        if (line[1].Type is TokenType.NewLine)
-        {
-            _program.Remove(position);
+            if (!_program.TryAdd(_lineKeyIndex, (line, false)))
+            { _program[_lineKeyIndex] = (line, false); }
+            
+            ++_lineKeyIndex;
             return;
         }
         
-        _program.Add(position, (line, true));
+        int label = int.Parse(line[0].ToString());
+        if (line.Length < 2 || line[1].Type is TokenType.NewLine)
+        { _program.Remove(label); }
+        else
+        {
+            if (!_program.TryAdd(label, (line, true)))
+            { _program[label] = (line, true); }
+        }
+        
+        if (label >= _lineKeyIndex)
+        { _lineKeyIndex = label + 1; }
     }
     
     private void ExecuteLine(TinyBasicToken[] line)
@@ -169,7 +162,7 @@ public class TinyBasicEnvironment
             }
             case "RETURN":
             {
-                if (!_returnQueue.TryDequeue(out int lineNumber))
+                if (!_returnStack.TryPop(out int lineNumber))
                 { throw new RuntimeException("Tried to return without invoking a subroutine"); }
                 
                 _lineKeyIndex = lineNumber;
@@ -219,7 +212,7 @@ public class TinyBasicEnvironment
     private void Clear()
     {
         _inputQueue.Clear();
-        _returnQueue.Clear();
+        _returnStack.Clear();
         _lineKeyIndex = 0;
         _program.Clear();
     }
@@ -271,7 +264,7 @@ public class TinyBasicEnvironment
         { throw new RuntimeException($"Label {label} does not exist"); }
 
         if (isSubroutine)
-        { _returnQueue.Enqueue(_lineKeyIndex); }
+        { _returnStack.Push(_lineKeyIndex); }
         
         _lineKeyIndex = (_program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
     }
