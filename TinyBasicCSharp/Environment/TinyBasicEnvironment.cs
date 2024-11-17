@@ -41,7 +41,7 @@ public class TinyBasicEnvironment
         { tokens = lexer.Tokenize(); }
         catch (TokenizationException ex)
         {
-            Console.WriteLine($"Syntax error: {ex.Message}");
+            Console.WriteLine($"Syntax error:\n >{ex.Message}");
             return;
         }
     
@@ -52,7 +52,7 @@ public class TinyBasicEnvironment
             if (!parser.ParseLine(out TinyBasicToken[] line, out string? error))
             {
                 int lineNumber = (line.Length > 0 && line[0].Type is TokenType.Number) ? int.Parse(line[0].ToString()) : _lineKeyIndex;
-                Console.WriteLine($"Line {lineNumber}: Syntax error: {error}");
+                Console.WriteLine($"Line {lineNumber}: Syntax error:\n >{error}");
                 return;
             }
 
@@ -73,7 +73,7 @@ public class TinyBasicEnvironment
         { tokens = lexer.Tokenize(); }
         catch (TokenizationException ex)
         {
-            Console.WriteLine($"Syntax error: {ex.Message}");
+            Console.WriteLine($"Syntax error:\n >{ex.Message}");
             return;
         }
         
@@ -83,12 +83,16 @@ public class TinyBasicEnvironment
         LineParser parser = new(tokens);
         if (!parser.ParseLine(out TinyBasicToken[] parsedLine, out string? error))
         {
-            Console.WriteLine($"Syntax error: {error}");
+            Console.WriteLine($"Syntax error:\n >{error}");
             return;
         }
 
-        UpdateProgram(parsedLine, parsedLine[0].Type is TokenType.Number);
-
+        var isLabeled = parsedLine[0].Type is TokenType.Number;
+        if (isLabeled)
+        {
+            UpdateProgram(parsedLine, isLabeled); 
+            return;
+        }
         try
         { ExecuteLine(parsedLine); }
         catch (RuntimeException ex)
@@ -310,20 +314,23 @@ public class TinyBasicEnvironment
         { tokens = lexer.Tokenize(); }
         catch (TokenizationException ex)
         {
-            Console.WriteLine($"Syntax error: {ex.Message}");
+            Console.WriteLine($"Syntax error:\n >{ex.Message}");
             return [];
         }
         
         int pointer = 0;
         while (pointer < tokens.Length)
         {
-            ExpressionToken expression = ParsingUtils.SelectExpressionFromLine(tokens, ref pointer);
+            var expressionSpan = ExpressionParser.SelectExpressionFromLine(tokens, pointer);
             try
-            { ParsingUtils.ParseExpression(expression); }
+            {
+                var expression = ExpressionParser.ParseExpression(expressionSpan);
+                expressions.Add(expression);
+            }
             catch (ParsingException ex)
-            { throw new ParsingException($"Error parsing expression: {ex.Message}"); } 
+            { throw new ParsingException($"Error parsing expression:\n >{ex.Message}"); } 
             
-            expressions.Add(expression);
+            pointer += expressionSpan.Length;
             pointer += 2;
         }
         return expressions;
@@ -333,7 +340,7 @@ public class TinyBasicEnvironment
     {
         var builder = new StringBuilder();
         int pointer = line[0].Type is TokenType.Number ? 2 : 1;
-        while (pointer < line.Length)
+        for (; pointer < line.Length; ++pointer)
         {
             TinyBasicToken token = line[pointer];
             switch (token.Type)

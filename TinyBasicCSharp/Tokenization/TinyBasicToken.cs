@@ -94,6 +94,35 @@ public class ExpressionToken : TinyBasicToken
     }
 }
 
+public class FunctionToken : TinyBasicToken
+{
+    public FunctionToken(TinyBasicToken[] arguments, string signature) : base(TokenType.Function)
+    {
+        Arguments = arguments;
+        Signature = signature;
+    }
+    
+    public string Signature { get; init; }
+    public TinyBasicToken[] Arguments { get; init; }
+
+    public override string ToString()
+    {
+        var builder = new StringBuilder();
+        builder.Append(Signature);
+        builder.Append('(');
+        foreach (var arg in Arguments)
+        {
+            builder.Append(arg);
+            builder.Append(',');
+        }
+        if (Arguments.Length > 0)
+        { builder.Remove(builder.Length - 1, 1); }
+        builder.Append(')');
+        
+        return builder.ToString();
+    }
+}
+
 public enum TokenType
 {
     Unknown,
@@ -114,5 +143,6 @@ public enum TokenType
     OperatorGreaterThanOrEqual,
     OperatorLessThan,
     OperatorLessThanOrEqual,
-    Expression
+    Expression,
+    Function
 }

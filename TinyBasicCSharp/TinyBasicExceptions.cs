@@ -35,6 +35,11 @@ public class InvalidVariableNameException : ParsingException
     public InvalidVariableNameException(string message) : base(message) {}
 }
 
+public class InvalidLabelException : ParsingException
+{
+    public InvalidLabelException(string message) : base(message) {}
+}
+
 public class RuntimeException : Exception
 {
     public RuntimeException(string message) : base(message) {}

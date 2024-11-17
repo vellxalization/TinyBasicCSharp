@@ -99,6 +99,20 @@ public class ExpressionEvaluator
 
                 return (short)(shouldNegate ? -value.Value : value.Value);
             }
+            case TokenType.Function:
+            {
+                var funcToken = (FunctionToken)token;
+                switch (funcToken.Signature)
+                {
+                    case "RND":
+                    {
+                        var randomValue = EvaluateRandom(funcToken);
+                        return (short)(shouldNegate ? -randomValue : randomValue);
+                    }
+                    default:
+                    { throw new RuntimeException($"Unknown function signature: {funcToken.Signature}"); }
+                }
+            }
             case TokenType.ParenthesisOpen:
             {
                 ++start;
@@ -109,5 +123,15 @@ public class ExpressionEvaluator
             default:
             { throw new RuntimeException($"Unexpected token (\"{token}\") in expression"); }
         }
+    }
+
+    private short EvaluateRandom(FunctionToken token)
+    {
+        var expressionArgument = (ExpressionToken)token.Arguments[0];
+        short argumentValue = EvaluateExpression(expressionArgument.Components);
+        if (argumentValue <= 0)
+        { throw new RuntimeException("Argument for RND function should be more than 0"); }
+        
+        return (short)Random.Shared.Next(0, argumentValue);
     }
 }
