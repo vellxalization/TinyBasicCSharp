@@ -79,17 +79,8 @@ public class ExpressionToken : TinyBasicToken
         var builder = new StringBuilder();
 
         foreach (TinyBasicToken token in Components)
-        {
-            // if (token.Type is TBTokenType.ParenthesisClose) // remove space before ')'
-            // { builder.Remove(builder.Length - 1, 1); }
-            
-            builder.Append(token);
-            
-            // if (token.Type is not TBTokenType.ParenthesisOpen) // not adding space after '('
-            // { builder.Append(' '); }
-        }
+        { builder.Append(token); }
         
-        // builder.Remove(builder.Length - 1, 1);
         return builder.ToString();
     }
 }

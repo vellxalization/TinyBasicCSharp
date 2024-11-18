@@ -95,13 +95,7 @@ public class Lexer
         while (_pointer < _sourceCode.Length)
         {
             char currentChar = _sourceCode[_pointer];
-            // if (currentChar is ' ') 
-            // {
-            //     // numbers with spaces between digits are allowed, so we skip any spaces
-            //     ++_pointer;
-            //     continue;
-            // }
-
+            
             if (char.IsDigit(currentChar))
             { ++_pointer; }
             else
