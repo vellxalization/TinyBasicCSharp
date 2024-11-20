@@ -8,13 +8,13 @@ public class TinyBasicEnvironment
 {
     public ConsoleCancelEventHandler CancelHandler { get; }
     
-    private SortedList<int, (TinyBasicToken[] line, bool isLabeled)> _program = new();
+    private SortedList<short, (Statement statement, bool isLabeled)> _program = new();
     private EnvironmentMemory _memory = new();
     private ExpressionEvaluator _evaluator;
     private bool _isRunning = false;
-    private int _lineKeyIndex = 0;
+    private short _lineKeyIndex = 0;
     
-    private Stack<int> _returnStack = new();
+    private Stack<short> _returnStack = new();
     private Queue<short> _inputQueue = new();
     
     public TinyBasicEnvironment()
@@ -49,17 +49,17 @@ public class TinyBasicEnvironment
         _lineKeyIndex = 1;
         while (parser.CanReadLine())
         {
-            if (!parser.ParseLine(out TinyBasicToken[] line, out string? error))
+            if (!parser.ParseLine(out Statement statement, out string? error))
             {
-                int lineNumber = (line.Length > 0 && line[0].Type is TokenType.Number) ? int.Parse(line[0].ToString()) : _lineKeyIndex;
+                int lineNumber = statement.Label ?? _lineKeyIndex;
                 Console.WriteLine($"Line {lineNumber}: Syntax error:\n >{error}");
                 return;
             }
 
-            if (line.Length is 0 || line[0].Type is TokenType.NewLine)
+            if (statement.Arguments.Length is 0 || statement.StatementType is StatementType.Newline)
             { continue; }
             
-            UpdateProgram(line, line[0].Type is TokenType.Number);
+            UpdateProgram(statement);
         }
 
         ExecuteProgram();
@@ -81,138 +81,169 @@ public class TinyBasicEnvironment
         { return; }
         
         LineParser parser = new(tokens);
-        if (!parser.ParseLine(out TinyBasicToken[] parsedLine, out string? error))
+        if (!parser.ParseLine(out var statement, out string? error))
         {
             Console.WriteLine($"Syntax error:\n >{error}");
             return;
         }
-
-        var isLabeled = parsedLine[0].Type is TokenType.Number;
-        if (isLabeled)
+        
+        if (statement.Label is not null)
         {
-            UpdateProgram(parsedLine, isLabeled); 
+            UpdateProgram(statement); 
             return;
         }
         try
-        { ExecuteLine(parsedLine); }
+        { ExecuteLine(statement); }
         catch (RuntimeException ex)
         { Console.WriteLine($"Runtime error: {ex.Message}"); }
     }
     
-    private void UpdateProgram(TinyBasicToken[] line, bool isLabeled)
+    private void UpdateProgram(Statement statement)
     {
+        bool isLabeled = statement.Label is not null;
         if (!isLabeled)
         {
-            if (!_program.TryAdd(_lineKeyIndex, (line, false)))
-            { _program[_lineKeyIndex] = (line, false); }
+            if (!_program.TryAdd(_lineKeyIndex, (statement, false)))
+            { _program[_lineKeyIndex] = (statement, false); }
             
             ++_lineKeyIndex;
             return;
         }
-        
-        int label = int.Parse(line[0].ToString());
-        if (line.Length < 2 || line[1].Type is TokenType.NewLine)
-        { _program.Remove(label); }
+
+        short label = statement.Label!.Value;
+        if (statement.StatementType is StatementType.Newline)
+        { _program.Remove(statement.Label!.Value); }
         else
         {
-            if (!_program.TryAdd(label, (line, true)))
-            { _program[label] = (line, true); }
+            if (!_program.TryAdd(label, (statement, true)))
+            { _program[label] = (statement, true); }
         }
         
         if (label >= _lineKeyIndex)
-        { _lineKeyIndex = label + 1; }
+        { _lineKeyIndex = (short)(label + 1); }
     }
     
-    private void ExecuteLine(TinyBasicToken[] line)
+    private void ExecuteLine(Statement statement)
     {
-        int commandIndex = line[0].Type is TokenType.Number ? 1 : 0; // skip line number
-        string command = line[commandIndex].ToString();
-        switch (command)
+        var arguments = statement.Arguments;
+        switch (statement.StatementType)
         {
-            case "LET":
+            case StatementType.Let:
             {
-                char address = char.Parse(line[commandIndex + 1].ToString());
-                var expression = (ExpressionToken)line[commandIndex + 3];
-                short value = _evaluator.EvaluateExpression(expression.Components);
-                _memory.WriteVariable(value, address);
+                ExecuteLet(arguments);
                 return;
             }
-            case "PRINT":
+            case StatementType.Print:
             {
-                string text = ExpressionListToString(line);
+                string text = ExpressionListToString(arguments);
                 Console.WriteLine(text);
                 return;
             }
-            case "INPUT":
+            case StatementType.Input:
             {
-                List<char> addresses = new();
-                foreach (TinyBasicToken token in line)
-                {
-                    if ((char.TryParse(token.ToString(), out char address)) && (address is > 'A' and < 'Z'))
-                    { addresses.Add(address); }
-                }
-                LoadAddressesWithValues(addresses);
+                ExecuteInput(arguments);
                 return;
             }
-            case "GOTO":
+            case StatementType.Goto:
             {
-                GoToLabel((commandIndex + 1), line, false);
+                GoToLabel(statement, false);
                 return;
             }
-            case "GOSUB":
+            case StatementType.Gosub:
             {
-                GoToLabel((commandIndex + 1), line, true);
+                GoToLabel(statement, true);
                 return;
             }
-            case "RETURN":
+            case StatementType.Return:
             {
-                if (!_returnStack.TryPop(out int lineNumber))
-                { throw new RuntimeException("Tried to return without invoking a subroutine"); }
-                
-                _lineKeyIndex = lineNumber;
+                ExecuteReturn();
                 return;
             }
-            case "END":
+            case StatementType.End:
             {
                 _isRunning = false;
                 return;
             }
-            case "LIST":
+            case StatementType.List:
             {
                 PrintProgram();
                 return;
             }
-            case "CLEAR":
+            case StatementType.Clear:
             {
                 Clear();
                 return;
             }
-            case "IF":
+            case StatementType.If:
             {
-                TinyBasicToken op = line[commandIndex + 2];
-                
-                var expression = (ExpressionToken)line[commandIndex + 1];
-                short value1 = _evaluator.EvaluateExpression(expression.Components);
-                expression = (ExpressionToken)line[commandIndex + 3];
-                short value2 = _evaluator.EvaluateExpression(expression.Components);
-                
-                if (CheckCondition(value1, value2, op))
-                { ExecuteLine(line[(commandIndex + 5)..]); }
-                
+                ExecuteIf(arguments);
                 return;
             }
-            case "RUN":
+            case StatementType.Run:
             {
                 ExecuteProgram();
                 return;
             }
-            case "REM":
+            case StatementType.Rem:
             { return; }
             default:
-            { throw new RuntimeException($"Tried to execute unknown command: {command}"); }
+            { throw new RuntimeException($"Tried to execute unknown command"); }
         }
     }
 
+    private void ExecuteReturn()
+    {
+        if (!_returnStack.TryPop(out short lineNumber))
+        { throw new RuntimeException("Tried to return without invoking a subroutine"); }
+
+        _lineKeyIndex = lineNumber;
+    }
+
+    private void ExecuteInput(TinyBasicToken[] arguments)
+    {
+        List<char> addresses = new();
+        foreach (TinyBasicToken token in arguments)
+        {
+            switch (token.Type)
+            {
+                case TokenType.Comma:
+                { continue; }
+                case TokenType.String:
+                {
+                    char address = char.Parse(token.ToString());
+                    addresses.Add(address);
+                    continue;
+                }
+                default:
+                { throw new RuntimeException($"Got unexpected token in variable list: {token}"); }
+            }
+        }
+        LoadAddressesWithValues(addresses);
+    }
+
+    private void ExecuteLet(TinyBasicToken[] arguments)
+    {
+        char address = char.Parse(arguments[0].ToString());
+        var expression = (ExpressionToken)arguments[^1];
+        short value = _evaluator.EvaluateExpression(expression);
+        _memory.WriteVariable(value, address);
+    }
+
+    private void ExecuteIf(TinyBasicToken[] arguments)
+    {
+        var expression = (ExpressionToken)arguments[0];
+        var value1 = _evaluator.EvaluateExpression(expression);
+        expression = (ExpressionToken)arguments[2];
+        var value2 = _evaluator.EvaluateExpression(expression);
+        
+        var op = arguments[1];
+        if (!CheckCondition(value1, value2, op))
+        { return; }
+
+        var nextStatement = (Statement)arguments[^1];
+        ExecuteLine(nextStatement);
+    }
+    
     private void Clear()
     {
         _inputQueue.Clear();
@@ -228,9 +259,9 @@ public class TinyBasicEnvironment
         _isRunning = true;
         while (_isRunning && _lineKeyIndex < _program.Count)
         {
-            TinyBasicToken[] line = _program.GetValueAtIndex(_lineKeyIndex).line;
+            Statement statement = _program.GetValueAtIndex(_lineKeyIndex).statement;
             try
-            { ExecuteLine(line); }
+            { ExecuteLine(statement); }
             catch (RuntimeException ex)
             {
                 Console.WriteLine($"Line {_program.GetKeyAtIndex(_lineKeyIndex)}: Runtime error: {ex.Message}");
@@ -246,31 +277,21 @@ public class TinyBasicEnvironment
     
     private void PrintProgram()
     {
-        var builder = new StringBuilder();
-
-        foreach (var (line, _) in _program.Values)
-        {
-            foreach (TinyBasicToken token in line)
-            {
-                builder.Append(token);
-                builder.Append(' ');
-            }
-            Console.WriteLine(builder.ToString());
-            builder.Clear();
-        }
+        foreach (var (statement, _) in _program.Values)
+        { Console.WriteLine(statement); }
     }
 
-    private void GoToLabel(int start, TinyBasicToken[] line, bool isSubroutine)
+    private void GoToLabel(Statement statement, bool isSubroutine)
     {
-        var expression = (ExpressionToken)line[start];
-        short label = _evaluator.EvaluateExpression(expression.Components);
+        var expression = (ExpressionToken)statement.Arguments[0];
+        short label = _evaluator.EvaluateExpression(expression);
         if ((!_program.TryGetValue(label, out var instruction)) || (!instruction.isLabeled))
         { throw new RuntimeException($"Label {label} does not exist"); }
 
         if (isSubroutine)
         { _returnStack.Push(_lineKeyIndex); }
         
-        _lineKeyIndex = (_program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
+        _lineKeyIndex = (short)(_program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
     }
     
     private void LoadAddressesWithValues(List<char> addresses)
@@ -289,7 +310,7 @@ public class TinyBasicEnvironment
             foreach (ExpressionToken expression in input)
             {
                 try
-                { value = _evaluator.EvaluateExpression(expression.Components); }
+                { value = _evaluator.EvaluateExpression(expression); }
                 catch (RuntimeException ex)
                 {
                     Console.WriteLine($"Input queue: Runtime error: {ex.Message}");
@@ -336,33 +357,30 @@ public class TinyBasicEnvironment
         return expressions;
     }
     
-    private string ExpressionListToString(TinyBasicToken[] line)
+    private string ExpressionListToString(TinyBasicToken[] exprList)
     {
         var builder = new StringBuilder();
-        int pointer = line[0].Type is TokenType.Number ? 2 : 1;
-        for (; pointer < line.Length; ++pointer)
+        foreach (var token in exprList)
         {
-            TinyBasicToken token = line[pointer];
             switch (token.Type)
             {
                 case TokenType.Comma:
-                {
-                    ++pointer;
-                    continue;
-                }
+                { continue; }
                 case TokenType.QuotedString:
                 {
                     builder.Append(token);
                     break;
                 }
-                default:
+                case TokenType.Expression:
                 {
-                    builder.Append(_evaluator.EvaluateExpression(((ExpressionToken)token).Components));
+                    builder.Append(_evaluator.EvaluateExpression((ExpressionToken)token));
                     break;
                 }
+                default:
+                { throw new RuntimeException($"Got unexpected token type in expression list: {token}"); }
             }
-            ++pointer;
         }
+      
         return builder.ToString();
     }
     

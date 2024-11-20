@@ -51,6 +51,9 @@ public class ExpressionParser
 
     public static ExpressionToken ParseExpression(Span<TinyBasicToken> selectedTokens)
     {
+        if (selectedTokens.Length is 0)
+        { throw new EmptyExpressionException("Tried to parse an empty expression"); }
+        
         List<TinyBasicToken> expression = [];
         int start = 0;
         try

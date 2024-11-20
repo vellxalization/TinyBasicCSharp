@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Data;
+using System.Text;
 
 namespace TinyCompilerForTinyBasic.Tokenization;
 
@@ -114,6 +115,62 @@ public class FunctionToken : TinyBasicToken
     }
 }
 
+public class Statement : TinyBasicToken
+{
+    public short? Label { get; init; } = null;
+    public StatementType StatementType { get; init; } = StatementType.Unknown;
+    public TinyBasicToken[] Arguments { get; init; } = [];
+
+    public Statement(short? label, StatementType statementType, TinyBasicToken[] arguments) : this()
+    {
+        Label = label;
+        StatementType = statementType;
+        Arguments = arguments;
+    }
+    
+    public Statement() : base(TokenType.Statement) {}
+
+    public override string ToString()
+    {
+        var builder = new StringBuilder();
+        if (Label is not null)
+        {
+            builder.Append(Label);
+            builder.Append(' ');
+        }
+
+        builder.Append(StatementType.ToString().ToUpper());
+        builder.Append(' ');
+        foreach (var arg in Arguments)
+        {
+            builder.Append(arg);
+            builder.Append(' ');
+        }
+        if (Arguments.Length > 0)
+        { builder.Remove(builder.Length - 1, 1); }
+        
+        return builder.ToString();
+    }
+}
+
+public enum StatementType
+{
+    Unknown,
+    Newline,
+    Print,
+    Let,
+    If,
+    Goto,
+    Gosub,
+    Input,
+    Return,
+    Clear,
+    List,
+    Run,
+    End,
+    Rem
+}
+
 public enum TokenType
 {
     Unknown,
@@ -135,5 +192,6 @@ public enum TokenType
     OperatorLessThan,
     OperatorLessThanOrEqual,
     Expression,
-    Function
+    Function,
+    Statement
 }

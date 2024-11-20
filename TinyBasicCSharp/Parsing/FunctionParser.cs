@@ -93,6 +93,7 @@ public class FunctionParser
         ++startFrom;
         if (startFrom >= tokens.Length || tokens[startFrom].Type is not TokenType.ParenthesisOpen)
         { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy); }
+        ++startFrom;
 
         int parenthesisCount = 1;
         while (true)
@@ -104,7 +105,7 @@ public class FunctionParser
             switch (token.Type)
             {
                 case TokenType.NewLine:
-                { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy); }
+                { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy + 1); }
                 case TokenType.ParenthesisOpen:
                 {
                     ++parenthesisCount;
@@ -114,7 +115,7 @@ public class FunctionParser
                 {
                     --parenthesisCount;
                     if (parenthesisCount == 0)
-                    { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy); }
+                    { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy + 1); }
 
                     break;
                 }

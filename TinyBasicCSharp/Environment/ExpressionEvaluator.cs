@@ -17,10 +17,10 @@ public class ExpressionEvaluator
     /// </summary>
     /// <param name="expression">Syntactically correct expression</param>
     /// <returns>Value of expression</returns>
-    public short EvaluateExpression(TinyBasicToken[] expression)
+    public short EvaluateExpression(ExpressionToken expression)
     {
         int start = 0;
-        short value = EvaluateExpression(expression, ref start);
+        short value = EvaluateExpression(expression.Components, ref start);
 
         return value;
     }
@@ -128,7 +128,7 @@ public class ExpressionEvaluator
     private short EvaluateRandom(FunctionToken token)
     {
         var expressionArgument = (ExpressionToken)token.Arguments[0];
-        short argumentValue = EvaluateExpression(expressionArgument.Components);
+        short argumentValue = EvaluateExpression(expressionArgument);
         if (argumentValue <= 0)
         { throw new RuntimeException("Argument for RND function should be more than 0"); }
         
