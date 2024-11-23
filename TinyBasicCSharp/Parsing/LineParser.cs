@@ -104,90 +104,102 @@ public class LineParser
         string value = token.ToString();
         StatementType type = StatementType.Unknown;
         TinyBasicToken[] arguments = [];
-        switch (value)
+
+        try
         {
-            case "REM":
+            switch (value)
             {
-                type = StatementType.Rem;
-                arguments = ParseRem();
-                break;
-            }
-            case "PRINT":
-            {
-                if (Peek() is null)
-                { throw new UnexpectedOrEmptyTokenException("Expected a list of expressions after PRINT keyword"); }
-                
-                type = StatementType.Print;
-                arguments = ParseExprList();
-                if (arguments.Length < 1)
-                { throw new ParsingException("Expected at least one expression or quoted string"); }
-                break;
-            }
-            case "IF":
-                if (Peek() is null)
-                { throw new UnexpectedOrEmptyTokenException("Expected an expression after IF keyword"); }
-                
-                type = StatementType.If;
-                arguments = ParseIf();
-                break;
-            case "GOSUB":
-            case "GOTO":
-            {
-                if (Peek() is null)
-                { throw new UnexpectedOrEmptyTokenException($"Expected an expression after {value} keyword"); }
+                case "REM":
+                {
+                    type = StatementType.Rem;
+                    arguments = ParseRem();
+                    break;
+                }
+                case "PRINT":
+                {
+                    type = StatementType.Print;
+                    if (Peek() is null)
+                    { throw new UnexpectedOrEmptyTokenException("Expected a list of expressions after PRINT keyword"); }
+                    
+                    arguments = ParseExprList();
+                    if (arguments.Length < 1)
+                    { throw new ParsingException("Expected at least one expression or quoted string in arguments"); }
+                    break;
+                }
+                case "IF":
+                    type = StatementType.If;
+                    if (Peek() is null)
+                    { throw new UnexpectedOrEmptyTokenException("Expected an expression after IF keyword"); }
+                    
+                    arguments = ParseIf();
+                    break;
+                case "GOSUB":
+                case "GOTO":
+                {
+                    type = value is "GOSUB" ? StatementType.Gosub : StatementType.Goto;
+                    if (Peek() is null)
+                    { throw new UnexpectedOrEmptyTokenException($"Expected an expression after {value} keyword"); }
 
-                type = value is "GOSUB" ? StatementType.Gosub : StatementType.Goto;
-                arguments = ParseGotoGosub();
-                break;
-            }
-            case "INPUT":
-            {
-                if (Peek() is null)
-                { throw new UnexpectedOrEmptyTokenException("Expected a list of variables after INPUT keyword"); }
+                    arguments = ParseGotoGosub();
+                    break;
+                }
+                case "INPUT":
+                {
+                    type = StatementType.Input;
+                    if (Peek() is null)
+                    { throw new UnexpectedOrEmptyTokenException("Expected a list of variables after INPUT keyword"); }
 
-                type = StatementType.Input;
-                arguments = ParseVarList();
-                if (arguments.Length < 1)
-                { throw new ParsingException("Expected at least one variable"); }
-                break;
-            }
-            case "LET":
-            {
-                if (Peek() is null)
-                { throw new UnexpectedOrEmptyTokenException("Expected a variable name after LET keyword"); }
+                    arguments = ParseVarList();
+                    if (arguments.Length < 1)
+                    { throw new ParsingException("Expected at least one variable in arguments"); }
+                    break;
+                }
+                case "LET":
+                {
+                    type = StatementType.Let;
+                    if (Peek() is null)
+                    { throw new UnexpectedOrEmptyTokenException("Expected a variable name after LET keyword"); }
 
-                type = StatementType.Let;
-                arguments = ParseLet();
-                break;
+                    arguments = ParseLet();
+                    break;
+                }
+                case "RETURN":
+                {
+                    type = StatementType.Return;
+                    break;
+                }
+                case "CLEAR":
+                {
+                    type = StatementType.Clear;
+                    break;
+                }
+                case "LIST":
+                {
+                    type = StatementType.List;
+                    break;
+                }
+                case "RUN":
+                {
+                    type = StatementType.Run;
+                    break;
+                }
+                case "END":
+                {
+                    type = StatementType.End;
+                    break;
+                }
+                default:
+                { throw new UnexpectedOrEmptyTokenException($"Unexpected keyword {token}"); }
             }
-            case "RETURN":
-            {
-                type = StatementType.Return;
-                break;
-            }
-            case "CLEAR":
-            {
-                type = StatementType.Clear;
-                break;
-            }
-            case "LIST":
-            {
-                type = StatementType.List;
-                break;
-            }
-            case "RUN":
-            {
-                type = StatementType.Run;
-                break;
-            }
-            case "END":
-            {
-                type = StatementType.End;
-                break;
-            }
-            default:
-            { throw new UnexpectedOrEmptyTokenException($"Unexpected keyword \"{token}\""); }
         }
+        catch(ParsingException ex)
+        {
+            if (type is StatementType.Unknown)
+            { throw; }
+
+            throw new ParsingException($"Error while parsing {type.ToString().ToUpper()} statement:\n >{ex.Message}");
+        }
+        
         
         return (type, arguments);
     }
@@ -236,13 +248,13 @@ public class LineParser
         if (next?.Type is not (TokenType.OperatorGreaterThan or TokenType.OperatorLessThan
             or TokenType.OperatorGreaterThanOrEqual or TokenType.OperatorLessThanOrEqual
             or TokenType.OperatorEquals or TokenType.OperatorNotEqual))
-        { throw new UnexpectedOrEmptyTokenException("Expected an operator after expression"); }
+        { throw new UnexpectedOrEmptyTokenException("Expected a comparison operator after expression"); }
         arguments.Add(next);
         
         ++_pointer;
         next = Peek();
         if (next is null)
-        { throw new UnexpectedOrEmptyTokenException("Expected an expression after operator"); }
+        { throw new UnexpectedOrEmptyTokenException("Expected an expression after comparison operator"); }
         
         ++_pointer;
         expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
@@ -295,19 +307,19 @@ public class LineParser
                     ++_pointer;
                     next = Peek();
                     if (next is null || next.Type is TokenType.NewLine or TokenType.Comma)
-                    { throw new UnexpectedOrEmptyTokenException("Expected an expression after comma"); }
+                    { throw new UnexpectedOrEmptyTokenException("Expected a next expression after comma"); }
                     continue;
                 }
                 default:
                 {
                     var expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
+                    if (expressionSpan.Length < 1)
+                    { throw new ParsingException($"Expected an expression, got {next}"); }
                     try
                     { 
                         var expression = ExpressionParser.ParseExpression(expressionSpan);
                         arguments.Add(expression);
                     }
-                    catch (EmptyExpressionException ex)
-                    { throw new ParsingException($"Expected an expression; got {next}"); }
                     catch (ParsingException ex)
                     { throw new ParsingException($"Error while parsing expression:\n >{ex.Message}"); }
                     
@@ -336,7 +348,7 @@ public class LineParser
                 {
                     var value = next.ToString();
                     if (!char.TryParse(value, out var address) || address is < 'A' or > 'Z')
-                    { throw new InvalidVariableNameException($"Expected a valid variable name; got {address}"); }
+                    { throw new InvalidVariableNameException($"Expected a valid variable name, got {address}"); }
                     arguments.Add(next);
 
                     ++_pointer;
@@ -352,7 +364,7 @@ public class LineParser
                     
                     next = Peek();
                     if (next is null || next.Type is TokenType.Comma or TokenType.NewLine)
-                    { throw new UnexpectedOrEmptyTokenException("Expected a variable after comma"); }
+                    { throw new UnexpectedOrEmptyTokenException("Expected a next variable after comma"); }
                     continue;
                 }
                 default:
@@ -366,23 +378,23 @@ public class LineParser
     private TinyBasicToken[] ParseLet()
     {
         List<TinyBasicToken> arguments = [];
-        TinyBasicToken? token = _tokens[_pointer];
-        if (!char.TryParse(token.ToString(), out char address) || (address is < 'A' or > 'Z'))
-        { throw new InvalidVariableNameException($"Expected a valid variable name; got {token}"); }
+        var next = Peek();
+        if (!char.TryParse(next?.ToString(), out char address) || (address is < 'A' or > 'Z'))
+        { throw new InvalidVariableNameException($"Expected a valid variable name, got {next}"); }
+        arguments.Add(next);
         
-        arguments.Add(token);
-        token = Peek();
-        if (token?.Type is not TokenType.OperatorEquals)
+        ++_pointer;
+        next = Peek();
+        if (next?.Type is not TokenType.OperatorEquals)
         { throw new UnexpectedOrEmptyTokenException($"Expected an assignment operator after {address} variable"); }
-        arguments.Add(token);
+        arguments.Add(next);
         
         ++_pointer;
-        token = Peek();
-        if (token is null)
+        next = Peek();
+        if (next is null || next.Type is TokenType.NewLine)
         { throw new UnexpectedOrEmptyTokenException("Expected an expression after assignment operator"); }
-        ++_pointer;
         
-        var expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer);
+        var expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
         try
         {
             var expression = ExpressionParser.ParseExpression(expressionSpan);

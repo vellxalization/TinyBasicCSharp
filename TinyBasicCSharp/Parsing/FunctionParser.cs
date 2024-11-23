@@ -12,12 +12,16 @@ public class FunctionParser
         
         if (selectedTokens[0].Type is not TokenType.String)
         { throw new UnexpectedOrEmptyTokenException("Expected a string function name"); }
-        if (selectedTokens[1].Type is not TokenType.ParenthesisOpen)
-        { throw new UnexpectedOrEmptyTokenException("Expected an open parenthesis after function name"); }
-        if (selectedTokens[^1].Type is not TokenType.ParenthesisClose)
-        { throw new UnexpectedOrEmptyTokenException("Expected a closing parenthesis"); }
-
         var signature = selectedTokens[0].ToString();
+        
+        if (selectedTokens[1].Type is not TokenType.ParenthesisOpen)
+        { throw new UnexpectedOrEmptyTokenException($"Expected an open parenthesis after function name {signature}"); }
+        if (selectedTokens[^1].Type is not TokenType.ParenthesisClose)
+        { throw new UnexpectedOrEmptyTokenException($"Expected a closing parenthesis after arguments for function {signature}"); }
+        
+        if (signature is not "RND")
+        { throw new ParsingException($"Unknown function name {signature}"); }
+        
         TinyBasicToken[][] arguments = [];
         if (selectedTokens.Length > 3)
         {
@@ -29,28 +33,28 @@ public class FunctionParser
         }
 
         FunctionToken token;
-        switch (selectedTokens[0].ToString())
+        switch (signature)
         {
             case "RND":
             {
                 try
-                { token = ParseRandom(arguments); }
+                { token = ParseArgsForRandom(arguments); }
                 catch (ParsingException ex)
-                { throw new ParsingException($"Error while parsing RND function:\n >{ex.Message}"); }
+                { throw new ParsingException($"Error while parsing arguments for RND function:\n >{ex.Message}"); }
 
                 break;
             }
             default:
-            { throw new UnexpectedOrEmptyTokenException("Unknown function name"); }
+            { throw new UnexpectedOrEmptyTokenException($"Unknown function name {signature}"); }
         }
 
         return token;
     }
 
-    private static FunctionToken ParseRandom(TinyBasicToken[][] arguments)
+    private static FunctionToken ParseArgsForRandom(TinyBasicToken[][] arguments)
     {
         if (arguments.Length != 1)
-        { throw new ParsingException("Invalid number of arguments for RND function"); }
+        { throw new ParsingException($"Expected 1 argument for RND function, got {arguments.Length}"); }
 
         try
         {
@@ -77,7 +81,7 @@ public class FunctionParser
             { throw new UnexpectedOrEmptyTokenException("Expected next argument after comma"); }
             
             arguments.Add(argsSlice.Slice(pointer, i - pointer).ToArray());
-            pointer = i;
+            pointer = i + 1;
         }
         
         arguments.Add(argsSlice.Slice(pointer, i - pointer).ToArray());
