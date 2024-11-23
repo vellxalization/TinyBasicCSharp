@@ -74,11 +74,8 @@ public class ExpressionParser
     {
         ParseTerm(selectedTokens, ref pointer, finalExpression);
         
-        while (true)
+        while (pointer + 1 < selectedTokens.Length)
         {
-            if (pointer + 1 >= selectedTokens.Length)
-            { return; }
-            
             var op = selectedTokens[pointer + 1];
             if (op.Type is not (TokenType.OperatorPlus or TokenType.OperatorMinus))
             { return; }
@@ -97,11 +94,8 @@ public class ExpressionParser
     {
         ParseFactor(selectedTokens, ref pointer, finalExpression);
         
-        while (pointer + 1 >= selectedTokens.Length)
+        while (pointer + 1 < selectedTokens.Length)
         {
-            if (pointer + 1 >= selectedTokens.Length)
-            { return; }
-            
             var op = selectedTokens[pointer + 1];
             if (op.Type is not (TokenType.OperatorDivision or TokenType.OperatorMultiplication))
             { return; }

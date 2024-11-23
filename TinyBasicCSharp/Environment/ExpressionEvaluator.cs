@@ -27,7 +27,7 @@ public class ExpressionEvaluator
 
     private short EvaluateExpression(TinyBasicToken[] expression, ref int start)
     {
-        int value = EvaluateTerm(expression, ref start);
+        short value = EvaluateTerm(expression, ref start);
         
         while ((start + 1) < expression.Length)
         {
@@ -36,10 +36,10 @@ public class ExpressionEvaluator
             { break; }
 
             start += 2;
-            int secondValue = EvaluateTerm(expression, ref start);
+            short secondValue = EvaluateTerm(expression, ref start);
             value = op.Type is TokenType.OperatorPlus ? unchecked((short)(value + secondValue)) : unchecked((short)(value - secondValue));
         }
-        return unchecked((short)value);
+        return value;
     }
     
     private short EvaluateTerm(TinyBasicToken[] expression, ref int start)
@@ -70,21 +70,17 @@ public class ExpressionEvaluator
     private short EvaluateFactor(TinyBasicToken[] expression, ref int start)
     {
         bool shouldNegate = false;
-        res:
         TinyBasicToken token = expression[start];
+        while (token.Type is TokenType.OperatorPlus or TokenType.OperatorMinus)
+        {
+            if (token.Type is TokenType.OperatorMinus)
+            { shouldNegate = !shouldNegate; }
+
+            ++start;
+            token = expression[start];
+        }
         switch (token.Type)
         {
-            case TokenType.OperatorMinus:
-            {
-                shouldNegate = !shouldNegate;
-                ++start;
-                goto res;
-            }
-            case TokenType.OperatorPlus:
-            {
-                ++start;
-                goto res;
-            }
             case TokenType.Number:
             {
                 int value = int.Parse(token.ToString());
