@@ -55,9 +55,6 @@ public class TinyBasicEnvironment
                 Console.WriteLine($"Line {lineNumber}: Syntax error:\n >{error}");
                 return;
             }
-
-            if (statement.Arguments.Length is 0 || statement.StatementType is StatementType.Newline)
-            { continue; }
             
             UpdateProgram(statement);
         }
@@ -264,7 +261,7 @@ public class TinyBasicEnvironment
             { ExecuteLine(statement); }
             catch (RuntimeException ex)
             {
-                Console.WriteLine($"Line {_program.GetKeyAtIndex(_lineKeyIndex)}: Runtime error: {ex.Message}");
+                Console.WriteLine($"Line {_program.GetKeyAtIndex(_lineKeyIndex)}: Runtime error:\n >{ex.Message}");
                 return;
             }
             ++_lineKeyIndex;
@@ -313,7 +310,7 @@ public class TinyBasicEnvironment
                 { value = _evaluator.EvaluateExpression(expression); }
                 catch (RuntimeException ex)
                 {
-                    Console.WriteLine($"Input queue: Runtime error: {ex.Message}");
+                    Console.WriteLine($"Input queue: Runtime error:\n >{ex.Message}");
                     continue;
                 }
                 _inputQueue.Enqueue(value);

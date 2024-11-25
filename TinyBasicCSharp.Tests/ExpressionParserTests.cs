@@ -17,21 +17,21 @@ public class ExpressionParserTests
     public void ExpressionParserInvalidTokenException(int index)
     {
         var expression = GetInvalidExpression(index);
-        Assert.Throws<UnexpectedOrEmptyTokenException>(() => ParsingUtils.ParseExpression(expression));
+        Assert.Throws<ParsingException>(() => ExpressionParser.ParseExpression(expression.Components));
     }
 
     [Fact]
     public void ExpressionParserInvalidVarNameException()
     {
         var expression = GetInvalidExpression(0);
-        Assert.Throws<InvalidVariableNameException>(() => ParsingUtils.ParseExpression(expression));
+        Assert.Throws<ParsingException>(() => ExpressionParser.ParseExpression(expression.Components));
     }
 
     [Fact]
     public void ExpressionParserEmptyExpressionException()
     {
         var expression = GetInvalidExpression(-1);
-        Assert.Throws<EmptyExpressionException>(() => ParsingUtils.ParseExpression(expression));
+        Assert.Throws<EmptyExpressionException>(() => ExpressionParser.ParseExpression(expression.Components));
     }
 
     [Theory]
@@ -45,7 +45,8 @@ public class ExpressionParserTests
     public void ExpressionParserTesting(int index)
     {
         // shouldn't get any exceptions
-        ParsingUtils.ParseExpression(GetValidExpression(index));
+        var expression = GetValidExpression(index);
+        ExpressionParser.ParseExpression(expression.Components);
     }
 
     private ExpressionToken GetValidExpression(int index)

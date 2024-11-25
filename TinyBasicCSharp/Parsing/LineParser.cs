@@ -206,7 +206,7 @@ public class LineParser
 
     private TinyBasicToken[] ParseGotoGosub()
     {
-        Span<TinyBasicToken> expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer);
+        Span<TinyBasicToken> expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
         try
         {
             var expression = ExpressionParser.ParseExpression(expressionSpan);
@@ -256,7 +256,6 @@ public class LineParser
         if (next is null)
         { throw new UnexpectedOrEmptyTokenException("Expected an expression after comparison operator"); }
         
-        ++_pointer;
         expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
         try
         { expression = ExpressionParser.ParseExpression(expressionSpan); }

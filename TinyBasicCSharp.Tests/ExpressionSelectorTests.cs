@@ -15,11 +15,10 @@ public class ExpressionSelectorTests
     {
         var line = GetLine(index);
         var expectedExpression = GetExpectedExpression(index).Components;
-        
-        int i = 0;
-        var actualExpression = ParsingUtils.SelectExpressionFromLine(line, ref i).Components;
+
+        var actualExpression = ExpressionParser.SelectExpressionFromLine(line, 0);
         Assert.True(actualExpression.Length == expectedExpression.Length);
-        for (i = 0; i < actualExpression.Length; ++i)
+        for (int i = 0; i < actualExpression.Length; ++i)
         {
             Assert.True(actualExpression[i].Type == expectedExpression[i].Type);
             

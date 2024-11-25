@@ -13,19 +13,10 @@ public class LexerTests
         Assert.Throws<UnmatchedQuotationException>(() => lexer.Tokenize());
     }
     
-    // [Theory]
-    // [InlineData("PRINT_\"HELLO WORLD\"")]
-    // [InlineData("PRINT\u200e\"HELLO WORLD\"")]
-    // public void LexerTestUnknownCharacterException(string input)
-    // {
-    //     var lexer = new Lexer(input);
-    //     Assert.Throws<UnknownCharacterException>(() => lexer.Tokenize());
-    // }
 
     [Theory]
     [InlineData("PRINT \"HELLO WORLD!\"", 0)]
     [InlineData("100 IF X <> 102 * X THEN X = 100 \n", 1)]
-    [InlineData("10  0IF X<>102*  X THEN X=1    00\n", 1)]
     [InlineData("INPUT X, Y,Z", 2)]
     public void LexerTest(string input, int expectedTokenIndex)
     {

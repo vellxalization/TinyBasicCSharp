@@ -22,9 +22,10 @@ public class ExpressionEvaluatorTests
         var lexer = new Lexer(input);
         var tokens = lexer.Tokenize();
         int start = 0;
-        var expression = ParsingUtils.SelectExpressionFromLine(tokens, ref start);
+        var expressionSpan = ExpressionParser.SelectExpressionFromLine(tokens, start);
+        var expression = ExpressionParser.ParseExpression(expressionSpan);
         var evaluator = new ExpressionEvaluator(memory);
-        Assert.Throws<UnitializedVariableException>(() => evaluator.EvaluateExpression(expression.Components));
+        Assert.Throws<UnitializedVariableException>(() => evaluator.EvaluateExpression(expression));
     }
     
     [Theory]
@@ -41,9 +42,10 @@ public class ExpressionEvaluatorTests
         var lexer = new Lexer(input);
         var tokens = lexer.Tokenize();
         int start = 0;
-        var expression = ParsingUtils.SelectExpressionFromLine(tokens, ref start);
+        var expressionSpan = ExpressionParser.SelectExpressionFromLine(tokens, start);
+        var expression = ExpressionParser.ParseExpression(expressionSpan);
         var evaluator = new ExpressionEvaluator(memory);
-        Assert.Throws<DivisionByZeroException>(() => evaluator.EvaluateExpression(expression.Components));
+        Assert.Throws<DivisionByZeroException>(() => evaluator.EvaluateExpression(expression));
     }
 
     [Theory]
@@ -64,9 +66,10 @@ public class ExpressionEvaluatorTests
         var lexer = new Lexer(input);
         var tokens = lexer.Tokenize();
         int start = 0;
-        var expression = ParsingUtils.SelectExpressionFromLine(tokens, ref start);
+        var expressionSpan = ExpressionParser.SelectExpressionFromLine(tokens, start);
+        var expression = ExpressionParser.ParseExpression(expressionSpan);
         var evaluator = new ExpressionEvaluator(memory);
-        short result = evaluator.EvaluateExpression(expression.Components);
+        short result = evaluator.EvaluateExpression(expression);
         Assert.Equal(expectedResult, result);
     }
 }
