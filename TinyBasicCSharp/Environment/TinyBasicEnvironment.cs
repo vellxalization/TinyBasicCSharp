@@ -56,6 +56,9 @@ public class TinyBasicEnvironment
                 return;
             }
             
+            if (statement is { Label: null, StatementType: StatementType.Newline })
+            { continue; }
+            
             UpdateProgram(statement);
         }
 
