@@ -264,7 +264,8 @@ public class TinyBasicEnvironment
             { ExecuteLine(statement); }
             catch (RuntimeException ex)
             {
-                Console.WriteLine($"Line {_program.GetKeyAtIndex(_lineKeyIndex)}: Runtime error:\n >{ex.Message}");
+                var lineNumber = _program.GetKeyAtIndex(_lineKeyIndex);
+                Console.WriteLine($"Line {lineNumber}: Runtime error:\n >{ex.Message}");
                 return;
             }
             ++_lineKeyIndex;
@@ -306,8 +307,8 @@ public class TinyBasicEnvironment
                 continue;
             }
 
-            List<ExpressionToken> input = RequestInput();
-            foreach (ExpressionToken expression in input)
+            var input = RequestInput();
+            foreach (var expression in input)
             {
                 try
                 { value = _evaluator.EvaluateExpression(expression); }
@@ -321,14 +322,13 @@ public class TinyBasicEnvironment
         }
     }
 
-    private List<ExpressionToken> RequestInput()
+    private ExpressionToken[] RequestInput()
     {
         Console.WriteLine('?');
         string? input = Console.ReadLine();
         if (string.IsNullOrEmpty(input))
         { return []; }
         
-        List<ExpressionToken> expressions = new();
         var lexer = new Lexer(input);
         TinyBasicToken[] tokens;
         try
@@ -338,23 +338,41 @@ public class TinyBasicEnvironment
             Console.WriteLine($"Syntax error:\n >{ex.Message}");
             return [];
         }
-        
-        int pointer = 0;
-        while (pointer < tokens.Length)
+
+        try
         {
-            var expressionSpan = ExpressionParser.SelectExpressionFromLine(tokens, pointer);
-            try
+            var inputExpressions = ParseInput(tokens);
+            return inputExpressions;
+        }
+        catch (ParsingException ex)
+        {
+            Console.WriteLine($"Error parsing INPUT expression:\n >{ex.Message}");
+            return [];
+        }
+    }
+
+    private ExpressionToken[] ParseInput(TinyBasicToken[] input)
+    {
+        var pointer = 0;
+        var expressions = new List<ExpressionToken>();
+        while (pointer < input.Length)
+        {
+            var token = input[pointer];
+            if (token.Type is TokenType.Comma)
             {
-                var expression = ExpressionParser.ParseExpression(expressionSpan);
-                expressions.Add(expression);
+                if (pointer + 1 >= input.Length)
+                { throw new ParsingException("Expected next expression after the comma"); }
+
+                ++pointer;
+                continue;
             }
-            catch (ParsingException ex)
-            { throw new ParsingException($"Error parsing expression:\n >{ex.Message}"); } 
+            var expressionSpan = ExpressionParser.SelectExpressionFromLine(input, pointer);
+            var expression = ExpressionParser.ParseExpression(expressionSpan);
+            expressions.Add(expression);
             
             pointer += expressionSpan.Length;
-            pointer += 2;
         }
-        return expressions;
+        return expressions.ToArray();
     }
     
     private string ExpressionListToString(TinyBasicToken[] exprList)
