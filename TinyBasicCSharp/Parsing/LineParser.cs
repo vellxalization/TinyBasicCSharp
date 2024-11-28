@@ -347,7 +347,7 @@ public class LineParser
                 {
                     var value = next.ToString();
                     if (!char.TryParse(value, out var address) || address is < 'A' or > 'Z')
-                    { throw new InvalidVariableNameException($"Expected a valid variable name, got {address}"); }
+                    { throw new InvalidVariableNameException($"Expected a valid variable name, got {value}"); }
                     arguments.Add(next);
 
                     ++_pointer;

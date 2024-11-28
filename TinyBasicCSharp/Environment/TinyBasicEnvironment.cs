@@ -367,6 +367,9 @@ public class TinyBasicEnvironment
                 continue;
             }
             var expressionSpan = ExpressionParser.SelectExpressionFromLine(input, pointer);
+            if (expressionSpan.Length < 1)
+            { throw new ParsingException($"Expected an expression, got {token}"); }
+            
             var expression = ExpressionParser.ParseExpression(expressionSpan);
             expressions.Add(expression);
             
