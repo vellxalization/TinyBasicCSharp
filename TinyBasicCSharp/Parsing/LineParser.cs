@@ -90,11 +90,10 @@ public class LineParser
         if (token.Type is not TokenType.Number)
         { throw new UnexpectedOrEmptyTokenException($"Label {token} should be a number"); }
         
-        var value = int.Parse(token.ToString());
-        if (value is < 1 or > short.MaxValue)
+        if (!short.TryParse(token.ToString(), out var value) || value is < 1 or > short.MaxValue)
         { throw new InvalidLabelException("Label should be more than 0 and less than 32768"); }
 
-        return (short)value;
+        return value;
     }
     
     private (StatementType type, TinyBasicToken[] arguments) ParseStatement()
@@ -138,7 +137,7 @@ public class LineParser
                 {
                     type = value is "GOSUB" ? StatementType.Gosub : StatementType.Goto;
                     if (Peek() is null)
-                    { throw new UnexpectedOrEmptyTokenException($"Expected an expression after {value} keyword"); }
+                    { throw new UnexpectedOrEmptyTokenException($"Expected a number after {value} keyword"); }
 
                     arguments = ParseGotoGosub();
                     break;
@@ -206,15 +205,9 @@ public class LineParser
 
     private TinyBasicToken[] ParseGotoGosub()
     {
-        Span<TinyBasicToken> expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
-        try
-        {
-            var expression = ExpressionParser.ParseExpression(expressionSpan);
-            _pointer += expressionSpan.Length;
-            return [expression];
-        }
-        catch (ParsingException ex)
-        { throw new ParsingException($"Failed to parse expression:\n >{ex.Message}"); }
+        ++_pointer;
+        ParseLabel();
+        return [_tokens[_pointer]];
     }
 
     private TinyBasicToken[] ParseRem()

@@ -7,15 +7,15 @@ namespace TinyCompilerForTinyBasic.Environment;
 public class TinyBasicEnvironment
 {
     public ConsoleCancelEventHandler CancelHandler { get; }
-    
-    private SortedList<short, (Statement statement, bool isLabeled)> _program = new();
+
+    protected SortedList<short, (Statement statement, bool isLabeled)> _program = new();
     private EnvironmentMemory _memory = new();
     private ExpressionEvaluator _evaluator;
-    private bool _isRunning = false;
-    private short _lineKeyIndex = 0;
+    protected bool _isRunning = false;
+    protected short _lineKeyIndex = 0;
     
-    private Stack<short> _returnStack = new();
-    private Queue<short> _inputQueue = new();
+    protected Stack<short> _returnStack = new();
+    protected Queue<short> _inputQueue = new();
     
     public TinyBasicEnvironment()
     {
@@ -123,7 +123,7 @@ public class TinyBasicEnvironment
         { _lineKeyIndex = (short)(label + 1); }
     }
     
-    private void ExecuteLine(Statement statement)
+    protected void ExecuteLine(Statement statement)
     {
         var arguments = statement.Arguments;
         switch (statement.StatementType)
@@ -252,7 +252,7 @@ public class TinyBasicEnvironment
         _program.Clear();
     }
 
-    private void ExecuteProgram()
+    protected virtual void ExecuteProgram()
     {
         _lineKeyIndex = 0;
 
@@ -284,8 +284,8 @@ public class TinyBasicEnvironment
 
     private void GoToLabel(Statement statement, bool isSubroutine)
     {
-        var expression = (ExpressionToken)statement.Arguments[0];
-        short label = _evaluator.EvaluateExpression(expression);
+        var labelToken = (ValueToken)statement.Arguments[0];
+        short label = short.Parse(labelToken.ToString());
         if ((!_program.TryGetValue(label, out var instruction)) || (!instruction.isLabeled))
         { throw new RuntimeException($"Label {label} does not exist"); }
 
