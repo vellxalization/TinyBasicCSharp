@@ -8,61 +8,30 @@ public class TinyBasicEnvironment
 {
     public ConsoleCancelEventHandler CancelHandler { get; }
 
-    protected SortedList<short, (Statement statement, bool isLabeled)> _program = new();
-    private EnvironmentMemory _memory = new();
-    private ExpressionEvaluator _evaluator;
-    protected bool _isRunning = false;
-    protected short _lineKeyIndex = 0;
+    protected SortedList<short, (Statement statement, bool isLabeled)> Program = new();
+    protected readonly EnvironmentMemory Memory = new();
+    private readonly ExpressionEvaluator _evaluator;
+    protected bool IsRunning = false;
+    protected short LineKeyIndex = 0;
     
-    protected Stack<short> _returnStack = new();
-    protected Queue<short> _inputQueue = new();
-    
+    protected readonly Stack<short> ReturnStack = new();
+    private readonly Queue<short> _inputQueue = new();
+
+    public DebugEnvironment CreateDebugEnvironment() => new() 
+        { Program = Program };
+
     public TinyBasicEnvironment()
     {
         CancelHandler = (_, args) =>
         {
-            if (!_isRunning)
+            if (!IsRunning)
             { return; }
             
-            _isRunning = false;
+            TerminateExecution();
             args.Cancel = true;
             Console.WriteLine("Execution terminated");
         };
-        _evaluator = new ExpressionEvaluator(_memory);
-    }
-    
-    public void ExecuteFile(string sourceCode)
-    {
-        Clear();
-        var lexer = new Lexer(sourceCode);
-        TinyBasicToken[] tokens;
-        
-        try
-        { tokens = lexer.Tokenize(); }
-        catch (TokenizationException ex)
-        {
-            Console.WriteLine($"Syntax error:\n >{ex.Message}");
-            return;
-        }
-    
-        var parser = new LineParser(tokens);
-        _lineKeyIndex = 1;
-        while (parser.CanReadLine())
-        {
-            if (!parser.ParseLine(out Statement statement, out string? error))
-            {
-                int lineNumber = statement.Label ?? _lineKeyIndex;
-                Console.WriteLine($"Line {lineNumber}: Syntax error:\n >{error}");
-                return;
-            }
-            
-            if (statement is { Label: null, StatementType: StatementType.Newline })
-            { continue; }
-            
-            UpdateProgram(statement);
-        }
-
-        ExecuteProgram();
+        _evaluator = new ExpressionEvaluator(Memory);
     }
     
     public void ExecuteDirectly(string line)
@@ -89,41 +58,32 @@ public class TinyBasicEnvironment
         
         if (statement.Label is not null)
         {
-            UpdateProgram(statement); 
+            AddStatement(statement); 
             return;
         }
         try
-        { ExecuteLine(statement); }
+        { ExecuteStatement(statement); }
         catch (RuntimeException ex)
         { Console.WriteLine($"Runtime error: {ex.Message}"); }
     }
-    
-    private void UpdateProgram(Statement statement)
+
+    protected virtual void AddStatement(Statement statement)
     {
-        bool isLabeled = statement.Label is not null;
-        if (!isLabeled)
+        var label = statement.Label;
+        if (label == null)
+        { throw new ArgumentException("Can't add statement without a label"); }
+
+        if (statement.StatementType is StatementType.Newline)
         {
-            if (!_program.TryAdd(_lineKeyIndex, (statement, false)))
-            { _program[_lineKeyIndex] = (statement, false); }
-            
-            ++_lineKeyIndex;
+            Program.Remove(label.Value);
             return;
         }
 
-        short label = statement.Label!.Value;
-        if (statement.StatementType is StatementType.Newline)
-        { _program.Remove(statement.Label!.Value); }
-        else
-        {
-            if (!_program.TryAdd(label, (statement, true)))
-            { _program[label] = (statement, true); }
-        }
-        
-        if (label >= _lineKeyIndex)
-        { _lineKeyIndex = (short)(label + 1); }
+        if (!Program.TryAdd(label.Value, (statement, true)))
+        { Program[label.Value] = (statement, true); }
     }
     
-    protected void ExecuteLine(Statement statement)
+    protected void ExecuteStatement(Statement statement)
     {
         var arguments = statement.Arguments;
         switch (statement.StatementType)
@@ -161,7 +121,7 @@ public class TinyBasicEnvironment
             }
             case StatementType.End:
             {
-                _isRunning = false;
+                TerminateExecution();
                 return;
             }
             case StatementType.List:
@@ -187,16 +147,22 @@ public class TinyBasicEnvironment
             case StatementType.Rem:
             { return; }
             default:
-            { throw new RuntimeException($"Tried to execute unknown command"); }
+            { throw new RuntimeException("Tried to execute unknown command"); }
         }
+    }
+
+    protected void TerminateExecution()
+    {
+        LineKeyIndex = -2;
+        IsRunning = false;
     }
 
     private void ExecuteReturn()
     {
-        if (!_returnStack.TryPop(out short lineNumber))
+        if (!ReturnStack.TryPop(out short lineNumber))
         { throw new RuntimeException("Tried to return without invoking a subroutine"); }
 
-        _lineKeyIndex = lineNumber;
+        LineKeyIndex = lineNumber;
     }
 
     private void ExecuteInput(TinyBasicToken[] arguments)
@@ -226,7 +192,7 @@ public class TinyBasicEnvironment
         char address = char.Parse(arguments[0].ToString());
         var expression = (ExpressionToken)arguments[^1];
         short value = _evaluator.EvaluateExpression(expression);
-        _memory.WriteVariable(value, address);
+        Memory.WriteVariable(value, address);
     }
 
     private void ExecuteIf(TinyBasicToken[] arguments)
@@ -241,44 +207,43 @@ public class TinyBasicEnvironment
         { return; }
 
         var nextStatement = (Statement)arguments[^1];
-        ExecuteLine(nextStatement);
+        ExecuteStatement(nextStatement);
     }
-    
-    private void Clear()
+
+    protected void Clear()
     {
         _inputQueue.Clear();
-        _returnStack.Clear();
-        _lineKeyIndex = 0;
-        _program.Clear();
+        ReturnStack.Clear();
+        LineKeyIndex = -2    ;
+        Program.Clear();
     }
 
-    protected virtual void ExecuteProgram()
+    protected void ExecuteProgram()
     {
-        _lineKeyIndex = 0;
-
-        _isRunning = true;
-        while (_isRunning && _lineKeyIndex < _program.Count)
+        LineKeyIndex = 0;
+        IsRunning = true;
+        while (IsRunning && LineKeyIndex < Program.Count)
         {
-            Statement statement = _program.GetValueAtIndex(_lineKeyIndex).statement;
+            Statement statement = Program.GetValueAtIndex(LineKeyIndex).statement;
             try
-            { ExecuteLine(statement); }
+            { ExecuteStatement(statement); }
             catch (RuntimeException ex)
             {
-                var lineNumber = _program.GetKeyAtIndex(_lineKeyIndex);
+                var lineNumber = Program.GetKeyAtIndex(LineKeyIndex);
                 Console.WriteLine($"Line {lineNumber}: Runtime error:\n >{ex.Message}");
                 return;
             }
-            ++_lineKeyIndex;
+            ++LineKeyIndex;
         }
 
-        if (_isRunning)
+        if (IsRunning)
         { Console.WriteLine("Runtime error: Run out of lines. Possibly missed the END or RETURN keyword?"); }
-        _isRunning = false;
+        TerminateExecution();
     }
     
     private void PrintProgram()
     {
-        foreach (var (statement, _) in _program.Values)
+        foreach (var (statement, _) in Program.Values)
         { Console.WriteLine(statement); }
     }
 
@@ -286,13 +251,13 @@ public class TinyBasicEnvironment
     {
         var labelToken = (ValueToken)statement.Arguments[0];
         short label = short.Parse(labelToken.ToString());
-        if ((!_program.TryGetValue(label, out var instruction)) || (!instruction.isLabeled))
+        if ((!Program.TryGetValue(label, out var instruction)) || (!instruction.isLabeled))
         { throw new RuntimeException($"Label {label} does not exist"); }
 
         if (isSubroutine)
-        { _returnStack.Push(_lineKeyIndex); }
+        { ReturnStack.Push(LineKeyIndex); }
         
-        _lineKeyIndex = (short)(_program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
+        LineKeyIndex = (short)(Program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
     }
     
     private void LoadAddressesWithValues(List<char> addresses)
@@ -302,7 +267,7 @@ public class TinyBasicEnvironment
         {
             if (_inputQueue.TryDequeue(out short value))
             {
-                _memory.WriteVariable(value, addresses[pointer]);
+                Memory.WriteVariable(value, addresses[pointer]);
                 ++pointer;
                 continue;
             }
