@@ -8,48 +8,71 @@ namespace TinyCompilerForTinyBasic;
 public class ConsoleApplication
 {
     private TinyBasicEnvironment _environment = new();
-
+    private ConsoleInterface<ConsoleApplication> _cli;
+    private bool _isRunning = false;
     public ConsoleApplication()
     {
+        _cli = new ConsoleInterface<ConsoleApplication>(this)
+        {
+            InputRequestPrefix = "(APP)> ",
+            Fallback = (application, command) =>
+            {
+                application._environment.ExecuteDirectly(string.Join(' ', command.Signature, string.Join(' ', command.Arguments)));
+            }
+        };
         Console.CancelKeyPress += _environment.CancelHandler;
+        RegisterCommands();
     }
 
+    private void RegisterCommands()
+    {
+        _cli.RegisterCommand("help", (application, command) => application.PrintHelp(command.Arguments));
+        _cli.RegisterCommand("execute", (application, command) => application.ExecuteFile(command.Arguments));
+        _cli.RegisterCommand("debug", (application, command) => application.Debug(command.Arguments));
+        _cli.RegisterCommand("exit", (application, _) => application._isRunning = false);
+    }
+    
+    private void ExecuteFile(string[] args)
+    {
+        var env = CreateFileEnvironment(args);
+        env.ExecuteLoadedFile();
+    }
+
+    private FileEnvironment CreateFileEnvironment(string[] args)
+    {
+        if (args.Length < 1)
+        { throw new ArgumentException("No path to file were provided"); }
+        
+        var stringPath = args[0];
+        if (stringPath[0] is '"' && stringPath[^1] is '"')
+        { stringPath = stringPath[1..^2]; }
+        var file = File.ReadAllText(stringPath);
+        
+        var fileEnvironment = new FileEnvironment();
+        fileEnvironment.LoadFile(file);
+        Console.CancelKeyPress += fileEnvironment.CancelHandler;
+        return fileEnvironment;
+    }
+    
     /// <summary>
     /// Main cycle. Asks user for input and executes commands/code
     /// </summary>
     public void Run()
     {
         Manual.PrintGreetings();
-        while (true)
+        _isRunning = true;
+        while (_isRunning)
         {
-            string input = Console.ReadLine() ?? "";
-            if (string.IsNullOrEmpty(input))
-            { continue; }
-
-            string[] commands = input.Split(" ");
-            switch (commands[0])
-            {
-                case "exit":
-                    return;
-                case "help":
-                    PrintHelp(commands);
-                    break;
-                case "execute":
-                    if (commands.Length < 1)
-                    {
-                        Console.WriteLine("No path were provided");
-                        break;
-                    }
-
-                    ExecuteFile(commands[1]);
-                    break;
-                default:
-                    _environment.ExecuteDirectly(input);
-                    break;
-            }
+             _cli.RequestAndExecute(true);
         }
     }
 
+    private void Debug(string[] args)
+    {
+        var debugEnvironment = args.Length > 0 ? CreateFileEnvironment(args).CreateDebugEnvironment() : _environment.CreateDebugEnvironment();
+        debugEnvironment.Debug().Wait();
+    }
+    
     /// <summary>
     /// Handles 'help' command
     /// </summary>
@@ -105,33 +128,7 @@ public class ConsoleApplication
                 return;
         }
     }
-
-    /// <summary>
-    /// Tries to read a file, load and execute it
-    /// </summary>
-    /// <param name="filePath">Path to .bas file</param>
-    private void ExecuteFile(string filePath)
-    {
-        var env = new TinyBasicEnvironment();
-        Console.CancelKeyPress += env.CancelHandler;
-
-        string sourceCode;
-        try
-        {
-            var fileInfo = new FileInfo(filePath);
-            sourceCode = File.ReadAllText(fileInfo.FullName);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error reading file: {ex.Message}");
-            Console.CancelKeyPress -= env.CancelHandler;
-            return;
-        }
-
-        env.ExecuteFile(sourceCode);
-        Console.CancelKeyPress -= env.CancelHandler;
-    }
-
+    
     /// <summary>
     /// Class for printing all possible help messages
     /// </summary>

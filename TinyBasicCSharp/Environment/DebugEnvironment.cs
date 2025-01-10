@@ -6,32 +6,24 @@ public class DebugEnvironment : TinyBasicEnvironment
 {
      private readonly HashSet<short> _breakPoints = [];
      private readonly ConsoleInterface<DebugEnvironment> _cli;
-
-     private void PrintProgram()
+     private PipeEmitter _emitter = new();
+     private async Task PrintProgram()
      {
-          Console.Clear();
+          Console.WriteLine("in");
+          await _emitter.WriteLine("clear", false, false);
           for (int i = 0; i < Program.Count; ++i)
           {
                var line = Program.GetValueAtIndex(i);
                var label = Program.GetKeyAtIndex(i);
                var lineToPrint = line.isLabeled ? line.statement.ToString() : $"({label}) {line.statement}";
-               if (i == LineKeyIndex)
-               {
-                    Console.BackgroundColor = ConsoleColor.DarkYellow;
-                    Console.Write($"—>{lineToPrint}");
-                    Console.BackgroundColor = ConsoleColor.Black;
-                    Console.WriteLine("");
-               }
+               if (LineKeyIndex == i)
+               { await _emitter.WriteLine(lineToPrint, false, true); }
                else if (_breakPoints.Contains(label))
-               {
-                    Console.BackgroundColor = ConsoleColor.DarkRed;
-                    Console.Write(lineToPrint);
-                    Console.BackgroundColor = ConsoleColor.Black;
-                    Console.WriteLine("");
-               }
-               else
-               { Console.WriteLine(lineToPrint); }
+               { await _emitter.WriteLine(lineToPrint, true, false); }
+               else 
+               { await _emitter.WriteLine(lineToPrint, false, false); }
           }
+          Console.WriteLine("out");
      }
      
      protected internal DebugEnvironment()
@@ -46,22 +38,22 @@ public class DebugEnvironment : TinyBasicEnvironment
      
      private void AddCommands()
      {
-          _cli.RegisterCommand("step", (environment, command) =>
+          _cli.RegisterCommand("step", async (environment, command) =>
           {
                var args = command.Arguments;
                switch (args.Length)
                {
                     case 0:
                     {
-                         environment.SingleStep(StepMode.In, false);
+                         await environment.SingleStep(StepMode.In, false);
                          return;
                     }
                     case 1:
                     {
                          if (args[0] is "-f" or "--force")
-                         { environment.SingleStep(StepMode.In, true); }
+                         { await environment.SingleStep(StepMode.In, true); }
                          else if (Enum.TryParse<StepMode>(args[0], true, out var step))
-                         { environment.SingleStep(step, false); }
+                         { await environment.SingleStep(step, false); }
                          else
                          { Console.WriteLine("Unknown argument provided"); }
 
@@ -74,7 +66,7 @@ public class DebugEnvironment : TinyBasicEnvironment
                          else if (args[1] is not ("-f" or "--force"))
                          { Console.WriteLine("Expected a force mode as a valid second argument"); }
                          else
-                         { environment.SingleStep(step, true); }
+                         { await environment.SingleStep(step, true); }
 
                          return;
                     }
@@ -82,7 +74,7 @@ public class DebugEnvironment : TinyBasicEnvironment
           });
           _cli.RegisterCommand("stack", (environment, _) =>
           { environment.PrintCallStack(); });
-          _cli.RegisterCommand("run", (environment, command) =>
+          _cli.RegisterCommand("run", async (environment, command) =>
           {
                var args = command.Arguments;
                switch (args.Length)
@@ -94,7 +86,7 @@ public class DebugEnvironment : TinyBasicEnvironment
                          if (!CanRun())
                          { return; }
                          RunToBreakpoint();
-                         PrintProgram();
+                         await PrintProgram();
                          return;
                     }
                     case 1:
@@ -110,7 +102,7 @@ public class DebugEnvironment : TinyBasicEnvironment
                               return;
                          }
                          RunTo(line, false);
-                         PrintProgram();
+                         await PrintProgram();
                          return;
                     }
                     default:
@@ -126,12 +118,12 @@ public class DebugEnvironment : TinyBasicEnvironment
                               return;
                          }
                          RunTo(line, true);
-                         PrintProgram();
+                         await PrintProgram();
                          return;
                     }
                }
           });
-          _cli.RegisterCommand("break", (_, command) =>
+          _cli.RegisterCommand("break", async (_, command) =>
           {
                var args = command.Arguments;
                if (args.Length == 0)
@@ -151,8 +143,9 @@ public class DebugEnvironment : TinyBasicEnvironment
                }
                if (!_breakPoints.Add(line))
                { _breakPoints.Remove(line); }
-               PrintProgram();
+               await PrintProgram();
           });
+          _cli.RegisterCommand("update", async (env, command) => await env.PrintProgram());
           _cli.RegisterCommand("memory", (environment, command) =>
           {
                var args = command.Arguments;
@@ -187,7 +180,7 @@ public class DebugEnvironment : TinyBasicEnvironment
           }
      }
      
-     public void Debug()
+     public async Task Debug()
      {
           LineKeyIndex = 0;
           IsRunning = true;
@@ -203,8 +196,9 @@ public class DebugEnvironment : TinyBasicEnvironment
                TerminateExecution();
                return;
           }
-          
-          InterruptExecution();
+
+          await InterruptExecution();
+          await _emitter.Close();
      }
      
      private void RunToBreakpoint()
@@ -221,9 +215,9 @@ public class DebugEnvironment : TinyBasicEnvironment
           }
      }
      
-     private void InterruptExecution()
+     private async Task InterruptExecution()
      {
-          PrintProgram();
+          await PrintProgram();
           while (CanRun())
           { _cli.RequestAndExecute(true); }
 
@@ -233,7 +227,7 @@ public class DebugEnvironment : TinyBasicEnvironment
           TerminateExecution();
      }
      
-     private void SingleStep(StepMode mode, bool ignoreBreakpoints)
+     private async Task SingleStep(StepMode mode, bool ignoreBreakpoints)
      {
           var currentLine = Program.GetValueAtIndex(LineKeyIndex);
           switch (mode)
@@ -279,7 +273,7 @@ public class DebugEnvironment : TinyBasicEnvironment
                     break;
                }
           }
-          PrintProgram();
+          await PrintProgram();
      }
 
      private void RunFrame(bool ignoreBreakpoints)

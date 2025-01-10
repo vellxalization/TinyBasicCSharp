@@ -5,12 +5,6 @@
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>TinyCompilerForTinyBasic</RootNamespace>
-        <LangVersion>13</LangVersion>
     </PropertyGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\DebuggingConsole\DebuggingConsole.csproj" />
-    </ItemGroup>
 
 </Project>
