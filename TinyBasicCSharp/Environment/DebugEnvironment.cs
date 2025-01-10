@@ -219,7 +219,7 @@ public class DebugEnvironment : TinyBasicEnvironment
      {
           await PrintProgram();
           while (CanRun())
-          { _cli.RequestAndExecute(true); }
+          { await _cli.RequestAndExecuteAsync(true); }
 
           if (!IsRunning) 
           { return; }

@@ -7,6 +7,7 @@ public class ConsoleInterface<T>
     public string? InputRequestPrefix { get; init; } = null;
     public Action<T, ConsoleCommand>? Fallback { get; init; }
     private readonly Dictionary<string, Action<T, ConsoleCommand>> _availableCommands = new();
+    private readonly Dictionary<string, Func<T, ConsoleCommand, Task>> _asyncCommands = new();
     private T _helpers;
     
     public ConsoleInterface(T helpers) => _helpers = helpers;
@@ -27,12 +28,36 @@ public class ConsoleInterface<T>
         }
     }
     
+    public async Task RequestAndExecuteAsync(bool retryIfFailed)
+    {
+        START:
+        var command = RequestInput();
+        if (command is null && retryIfFailed)
+        { goto START; }
+        try
+        { await ExecuteCommandAsync(command!); }
+        catch (ArgumentException ex)
+        {
+            Console.WriteLine(ex.Message);
+            if (retryIfFailed)
+            { goto START; }
+        }
+    }
+    
     public void RegisterCommand(string signature, Action<T, ConsoleCommand> action)
     {
         if (string.IsNullOrWhiteSpace(signature))
         { throw new ArgumentException("Command signature can't be empty"); }
         
         _availableCommands.Add(signature, action);
+    }
+    
+    public void RegisterCommand(string signature, Func<T, ConsoleCommand, Task> func)
+    {
+        if (string.IsNullOrWhiteSpace(signature))
+        { throw new ArgumentException("Command signature can't be empty"); }
+        
+        _asyncCommands.Add(signature, func);
     }
     
     private void ExecuteCommand(ConsoleCommand command)
@@ -46,6 +71,24 @@ public class ConsoleInterface<T>
         if (Fallback is null)
         { throw new ArgumentException($"Tried to execute unregistered command with no fallback provided: {command.Signature}"); }
         Fallback(_helpers, command);
+    }
+    
+    private Task ExecuteCommandAsync(ConsoleCommand command)
+    {
+        if (_asyncCommands.TryGetValue(command.Signature, out var asyncAction))
+        { return asyncAction(_helpers, command); }
+
+        if (_availableCommands.TryGetValue(command.Signature, out var action))
+        {
+            action.Invoke(_helpers, command);
+            return Task.CompletedTask;
+        }
+
+        if (Fallback is null)
+        { throw new ArgumentException($"Tried to execute unregistered command with no fallback provided: {command.Signature}"); }
+        
+        Fallback(_helpers, command);
+        return Task.CompletedTask;
     }
     
     private ConsoleCommand? RequestInput()

@@ -28,7 +28,7 @@ public class ConsoleApplication
     {
         _cli.RegisterCommand("help", (application, command) => application.PrintHelp(command.Arguments));
         _cli.RegisterCommand("execute", (application, command) => application.ExecuteFile(command.Arguments));
-        _cli.RegisterCommand("debug", (application, command) => application.Debug(command.Arguments));
+        _cli.RegisterCommand("debug", async (application, command) => await application.Debug(command.Arguments));
         _cli.RegisterCommand("exit", (application, _) => application._isRunning = false);
     }
     
@@ -57,20 +57,18 @@ public class ConsoleApplication
     /// <summary>
     /// Main cycle. Asks user for input and executes commands/code
     /// </summary>
-    public void Run()
+    public async Task Run()
     {
         Manual.PrintGreetings();
         _isRunning = true;
         while (_isRunning)
-        {
-             _cli.RequestAndExecute(true);
-        }
+        { await _cli.RequestAndExecuteAsync(true); }
     }
 
-    private void Debug(string[] args)
+    private Task Debug(string[] args)
     {
         var debugEnvironment = args.Length > 0 ? CreateFileEnvironment(args).CreateDebugEnvironment() : _environment.CreateDebugEnvironment();
-        debugEnvironment.Debug().Wait();
+        return debugEnvironment.Debug();
     }
     
     /// <summary>
