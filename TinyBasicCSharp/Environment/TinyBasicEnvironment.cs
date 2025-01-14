@@ -12,13 +12,12 @@ public class TinyBasicEnvironment
     protected readonly EnvironmentMemory Memory = new();
     private readonly ExpressionEvaluator _evaluator;
     protected bool IsRunning = false;
-    protected short LineKeyIndex = 0;
+    protected short CurrentLineIndex = 0;
     
     protected readonly Stack<short> ReturnStack = new();
     private readonly Queue<short> _inputQueue = new();
 
-    public DebugEnvironment CreateDebugEnvironment() => new() 
-        { Program = Program };
+    public DebugEnvironment CreateDebugEnvironment() => new(Program); 
 
     public TinyBasicEnvironment()
     {
@@ -58,7 +57,7 @@ public class TinyBasicEnvironment
         
         if (statement.Label is not null)
         {
-            AddStatement(statement); 
+            UpdateProgram(statement); 
             return;
         }
         try
@@ -67,7 +66,7 @@ public class TinyBasicEnvironment
         { Console.WriteLine($"Runtime error: {ex.Message}"); }
     }
 
-    protected virtual void AddStatement(Statement statement)
+    protected virtual void UpdateProgram(Statement statement)
     {
         var label = statement.Label;
         if (label == null)
@@ -153,7 +152,7 @@ public class TinyBasicEnvironment
 
     protected void TerminateExecution()
     {
-        LineKeyIndex = -2;
+        CurrentLineIndex = -2;
         IsRunning = false;
     }
 
@@ -162,7 +161,7 @@ public class TinyBasicEnvironment
         if (!ReturnStack.TryPop(out short lineNumber))
         { throw new RuntimeException("Tried to return without invoking a subroutine"); }
 
-        LineKeyIndex = lineNumber;
+        CurrentLineIndex = lineNumber;
     }
 
     private void ExecuteInput(TinyBasicToken[] arguments)
@@ -214,26 +213,26 @@ public class TinyBasicEnvironment
     {
         _inputQueue.Clear();
         ReturnStack.Clear();
-        LineKeyIndex = -2    ;
+        CurrentLineIndex = -2    ;
         Program.Clear();
     }
 
     protected void ExecuteProgram()
     {
-        LineKeyIndex = 0;
+        CurrentLineIndex = 0;
         IsRunning = true;
-        while (IsRunning && LineKeyIndex < Program.Count)
+        while (IsRunning && CurrentLineIndex < Program.Count)
         {
-            Statement statement = Program.GetValueAtIndex(LineKeyIndex).statement;
+            Statement statement = Program.GetValueAtIndex(CurrentLineIndex).statement;
             try
             { ExecuteStatement(statement); }
             catch (RuntimeException ex)
             {
-                var lineNumber = Program.GetKeyAtIndex(LineKeyIndex);
+                var lineNumber = Program.GetKeyAtIndex(CurrentLineIndex);
                 Console.WriteLine($"Line {lineNumber}: Runtime error:\n >{ex.Message}");
                 return;
             }
-            ++LineKeyIndex;
+            ++CurrentLineIndex;
         }
 
         if (IsRunning)
@@ -255,9 +254,9 @@ public class TinyBasicEnvironment
         { throw new RuntimeException($"Label {label} does not exist"); }
 
         if (isSubroutine)
-        { ReturnStack.Push(LineKeyIndex); }
+        { ReturnStack.Push(CurrentLineIndex); }
         
-        LineKeyIndex = (short)(Program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
+        CurrentLineIndex = (short)(Program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
     }
     
     private void LoadAddressesWithValues(List<char> addresses)

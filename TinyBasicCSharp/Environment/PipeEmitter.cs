@@ -1,61 +1,121 @@
 using System.Diagnostics;
 using System.IO.Pipes;
+using TinyCompilerForTinyBasic.Tokenization;
 
 namespace TinyCompilerForTinyBasic.Environment;
 
 public class PipeEmitter
 {
-    private NamedPipeServerStream _stream = new("tbDebuggerPipe", PipeDirection.Out);
-    private StreamWriter _writer;
     private Process? _process;
-    
-    public async Task WriteLine(string line, bool isBreak, bool isCurrentLine)
+    private NamedPipeServerStream? _stream;
+    private StreamWriter? _writer;
+
+    // copy of the state to allow autoreloading 
+    private HashSet<short> _breakpoints;
+    private short _currentLine;
+    private SortedList<short, (Statement statement, bool isLabeled)> _program;
+
+    public PipeEmitter(HashSet<short> breakpoints, SortedList<short, (Statement statement, bool isLabeled)> program)
     {
-        if (!_stream.IsConnected)
-        {
-            if (!(await Init()))
-            { throw new Exception("bruh"); }
-        }
-        await _writer.WriteLineAsync(isBreak ? $"[B]{line}" 
-            : isCurrentLine ? $"[C]:{line}" 
-            : line);
+        _program = program;
+        _breakpoints = breakpoints;
     }
 
-    public async Task Close()
+    public async Task EnsureConnected()
     {
-        await _stream.FlushAsync();
-        _stream.Close();
-        _process?.Kill();
+        Console.WriteLine("Ensuring");
+        if (_process is { HasExited: false } && _stream is { IsConnected: true })
+        { return; }
+
+        if (_process == null || _process.HasExited)
+        {
+            if (_writer != null)
+            { await _writer.DisposeAsync(); }
+            _process?.Kill();
+            _process?.Dispose();
+            StartProcess();
+        }
+
+        if (_stream == null || !_stream.IsConnected)
+        { await CreatePipe(); }
+        await SendInitialState();
     }
 
-    private async Task<bool> Init()
+    private async Task CreatePipe()
     {
-        if (_process?.HasExited ?? false)
-        {
-            _process.Close();
-            _process.Dispose();
-        }
+        _stream = new NamedPipeServerStream("tbDebuggerPipe", PipeDirection.Out);
+        await _stream.WaitForConnectionAsync();
+        _writer = new StreamWriter(_stream) { AutoFlush = true };
+    }
+
+    private void StartProcess()
+    {
         _process = new Process();
         _process.StartInfo.FileName = "DebuggingConsole";
         _process.StartInfo.UseShellExecute = true;
         if (!_process.Start())
         { throw new Exception("Failed to start debugging console."); }
+    }
+    
+    private async Task SendInitialState()
+    {
+        foreach (var (label, statement) in _program)
+        {
+            var stringToWrite = statement.isLabeled ? statement.statement.ToString() : $"({label}) {statement.statement}";
+            await AddLine(stringToWrite, label);
+        }
+        await Print();
+    
+        foreach (var breakpoint in _breakpoints)
+        { await UpdateBreakpoint(breakpoint); }
+        await UpdateCurrentLine(_currentLine);
+    }
+    
+    public async Task UpdateLine(Statement statement, short index)
+    {
+        var stringToSend = $"u:{index}:{statement}";
+        await _writer!.WriteLineAsync(stringToSend);
+    }
+
+    public async Task AddLine(Statement statement, short label)
+    {
+        var stringToSend = $"a:{label}:{statement}";
+        await _writer!.WriteLineAsync(stringToSend);
+    }
+
+    private async Task AddLine(string line, short label) => await _writer!.WriteLineAsync($"a:{label}:{line}");
+    
+    public async Task RemoveLine(short index)
+    {
+        var stringToSend = $"r:{index}";
+        await _writer!.WriteLineAsync(stringToSend);
+    }
+
+    public async Task Print()
+    { await _writer!.WriteLineAsync("print"); }
+
+    public async Task UpdateBreakpoint(short breakpoint)
+    {
+        var stringToSend = $"b:{breakpoint}";
+        await _writer!.WriteLineAsync(stringToSend);
+    }
+
+    public async Task UpdateCurrentLine(short currentLine)
+    {
+        _currentLine = currentLine;
+        var stringToSend = $"c:{currentLine}";
+        await _writer!.WriteLineAsync(stringToSend);
+    }
+    
+    public async Task Close()
+    {
+        if (_stream != null)
+        {
+            await _stream.FlushAsync();
+            await _writer!.DisposeAsync();
+        }
         
-        try
-        {
-            await _stream.WaitForConnectionAsync();
-            _writer = new StreamWriter(_stream) { AutoFlush = true };
-            Console.WriteLine("connected");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to connect to debugging console: {ex.Message}");
-            _process.Kill();
-            _stream.Close();
-            await _stream.DisposeAsync();
-            await _writer.DisposeAsync();
-            return false;
-        }
+        _process?.Kill();
+        _process?.Dispose();
     }
 }

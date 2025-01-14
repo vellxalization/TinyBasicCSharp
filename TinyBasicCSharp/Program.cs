@@ -4,4 +4,4 @@ using TinyCompilerForTinyBasic.Parsing;
 using TinyCompilerForTinyBasic.Tokenization;
 
 var app = new ConsoleApplication();
-app.Run();
+await app.Run();

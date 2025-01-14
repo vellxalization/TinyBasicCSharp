@@ -6,34 +6,18 @@ public class DebugEnvironment : TinyBasicEnvironment
 {
      private readonly HashSet<short> _breakPoints = [];
      private readonly ConsoleInterface<DebugEnvironment> _cli;
-     private PipeEmitter _emitter = new();
-     private async Task PrintProgram()
-     {
-          Console.WriteLine("in");
-          await _emitter.WriteLine("clear", false, false);
-          for (int i = 0; i < Program.Count; ++i)
-          {
-               var line = Program.GetValueAtIndex(i);
-               var label = Program.GetKeyAtIndex(i);
-               var lineToPrint = line.isLabeled ? line.statement.ToString() : $"({label}) {line.statement}";
-               if (LineKeyIndex == i)
-               { await _emitter.WriteLine(lineToPrint, false, true); }
-               else if (_breakPoints.Contains(label))
-               { await _emitter.WriteLine(lineToPrint, true, false); }
-               else 
-               { await _emitter.WriteLine(lineToPrint, false, false); }
-          }
-          Console.WriteLine("out");
-     }
+     private PipeEmitter _emitter;
      
-     protected internal DebugEnvironment()
+     protected internal DebugEnvironment(SortedList<short, (Statement statement, bool isLabeled)> program)
      {
           _cli = new ConsoleInterface<DebugEnvironment>(this)
           {
                InputRequestPrefix = "(DEBUG)> ",
                Fallback = (environment, command) => environment.ExecuteDirectly(string.Join(' ', command.Signature, string.Join(' ', command.Arguments))), 
           };
+          Program = program;
           AddCommands();
+          _emitter = new PipeEmitter(_breakPoints, Program);
      }
      
      private void AddCommands()
@@ -81,12 +65,13 @@ public class DebugEnvironment : TinyBasicEnvironment
                {
                     case 0:
                     {
-                         environment.ExecuteStatement(Program.GetValueAtIndex(LineKeyIndex).statement);
-                         ++LineKeyIndex;
+                         environment.ExecuteStatement(Program.GetValueAtIndex(CurrentLineIndex).statement);
+                         ++CurrentLineIndex;
                          if (!CanRun())
                          { return; }
-                         RunToBreakpoint();
-                         await PrintProgram();
+                         environment.RunToBreakpoint();
+                         await _emitter.EnsureConnected();
+                         await _emitter.UpdateCurrentLine(CurrentLineIndex);
                          return;
                     }
                     case 1:
@@ -101,8 +86,9 @@ public class DebugEnvironment : TinyBasicEnvironment
                               Console.WriteLine("Can't run to a comment line");
                               return;
                          }
-                         RunTo(line, false);
-                         await PrintProgram();
+                         environment.RunTo(line, false);
+                         await _emitter.EnsureConnected();
+                         await _emitter.UpdateCurrentLine(CurrentLineIndex);
                          return;
                     }
                     default:
@@ -117,8 +103,9 @@ public class DebugEnvironment : TinyBasicEnvironment
                               Console.WriteLine("Expected a force mode as a valid second argument");
                               return;
                          }
-                         RunTo(line, true);
-                         await PrintProgram();
+                         environment.RunTo(line, true);
+                         await _emitter.EnsureConnected();
+                         await _emitter.UpdateCurrentLine(CurrentLineIndex);
                          return;
                     }
                }
@@ -131,9 +118,15 @@ public class DebugEnvironment : TinyBasicEnvironment
                     Console.WriteLine("Expected an argument");
                     return;
                }
+               if (args[0] is "-a" or "--all")
+               {
+                    foreach (var breakPoint in _breakPoints.Order())
+                    { Console.WriteLine($"Breakpoint at: {breakPoint}"); }
+                    return;
+               }
                if (!ValidateLineNumberArgument(args[0], out var line, out var statement))
                {
-                    Console.WriteLine("Expected a valid line number as an argument");
+                    Console.WriteLine("Expected a valid line number or \"-a\"/\"--all\" as an argument");
                     return;
                }
                if (statement.statement.StatementType == StatementType.Rem)
@@ -141,11 +134,13 @@ public class DebugEnvironment : TinyBasicEnvironment
                     Console.WriteLine("Can't place a breakpoint on a comment line");
                     return;
                }
+               
+               await _emitter.EnsureConnected();
                if (!_breakPoints.Add(line))
                { _breakPoints.Remove(line); }
-               await PrintProgram();
+               await _emitter.UpdateBreakpoint(line);
           });
-          _cli.RegisterCommand("update", async (env, command) => await env.PrintProgram());
+          _cli.RegisterCommand("update", async (env, _) => await env._emitter.Print());
           _cli.RegisterCommand("memory", (environment, command) =>
           {
                var args = command.Arguments;
@@ -182,14 +177,14 @@ public class DebugEnvironment : TinyBasicEnvironment
      
      public async Task Debug()
      {
-          LineKeyIndex = 0;
+          CurrentLineIndex = 0;
           IsRunning = true;
           if (!CanRun())
           { 
                TerminateExecution();
                return;
           }
-          if (Program.GetValueAtIndex(LineKeyIndex).statement.StatementType == StatementType.Rem)
+          if (Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
           { SkipComments(); }
           if (!CanRun())
           { 
@@ -197,27 +192,96 @@ public class DebugEnvironment : TinyBasicEnvironment
                return;
           }
 
-          await InterruptExecution();
-          await _emitter.Close();
+          await _emitter.EnsureConnected();
+          await _emitter.UpdateCurrentLine(CurrentLineIndex);
+          
+          try
+          { await InterruptExecution(); }
+          catch (RuntimeException ex)
+          { Console.WriteLine($"Runtime error:\n >{ex.Message}"); }
+          finally
+          { await _emitter.Close(); }
      }
      
      private void RunToBreakpoint()
      {
           while (CanRun())
           {
-               var label = Program.GetKeyAtIndex(LineKeyIndex);
-               if (_breakPoints.Contains(label))
+               // var label = Program.GetKeyAtIndex(LineKeyIndex);
+               if (_breakPoints.Contains(Program.GetKeyAtIndex(CurrentLineIndex)))
                { return; }
                
-               Statement statement = Program.GetValueAtIndex(LineKeyIndex).statement;
+               Statement statement = Program.GetValueAtIndex(CurrentLineIndex).statement;
                ExecuteStatement(statement);
-               ++LineKeyIndex;
+               ++CurrentLineIndex;
           }
      }
-     
+
+     protected override async void UpdateProgram(Statement statement)
+     {
+          if (statement.Label is null)
+          { throw new ArgumentException("Provided statement should be labeled"); }
+          
+          if (statement.StatementType == StatementType.Newline)
+          { await RemoveLine(statement.Label.Value); }
+          else
+          { await AddOrUpdateLine(statement); }
+     }
+
+     private async Task AddOrUpdateLine(Statement statement)
+     {
+          await _emitter.EnsureConnected();
+          var label = statement.Label!.Value;
+          var insertedNew = Program.TryAdd(label, (statement, true));
+          var indexOfNew = (short)Program.IndexOfKey(label);
+          if (insertedNew)
+          {
+               await _emitter.AddLine(statement, label);
+               if (indexOfNew <= CurrentLineIndex)
+               {
+                    ++CurrentLineIndex; // adjust current index
+                    await _emitter.UpdateCurrentLine(CurrentLineIndex);
+               }
+          }
+          else
+          {
+               Program.SetValueAtIndex(indexOfNew, (statement, true));
+               await _emitter.UpdateLine(statement, indexOfNew);
+               if (CurrentLineIndex == indexOfNew && statement.StatementType == StatementType.Rem)
+               {
+                    SkipComments();
+                    await _emitter.UpdateCurrentLine(CurrentLineIndex);
+               }
+          }
+          await _emitter.Print();
+     }
+
+     private async Task RemoveLine(short label)
+     {
+          await _emitter.EnsureConnected();
+          if (_breakPoints.Remove(label))
+          { await _emitter.UpdateBreakpoint(label); }
+          
+          var removedIndex = (short)Program.IndexOfKey(label);
+          Program.RemoveAt(removedIndex);
+          await _emitter.RemoveLine(removedIndex);
+
+          if (CurrentLineIndex == removedIndex && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
+          {
+               SkipComments();
+               await _emitter.UpdateCurrentLine(CurrentLineIndex);
+          }
+          else if (CurrentLineIndex > removedIndex)
+          {
+               --CurrentLineIndex; // adjust current index
+               await _emitter.UpdateCurrentLine(CurrentLineIndex);
+          }
+          await _emitter.Print();
+     }
+
      private async Task InterruptExecution()
      {
-          await PrintProgram();
+          // await _emitter.SendInitialState(_breakPoints, CurrentLineIndex, Program);
           while (CanRun())
           { await _cli.RequestAndExecuteAsync(true); }
 
@@ -229,16 +293,16 @@ public class DebugEnvironment : TinyBasicEnvironment
      
      private async Task SingleStep(StepMode mode, bool ignoreBreakpoints)
      {
-          var currentLine = Program.GetValueAtIndex(LineKeyIndex);
+          var currentLine = Program.GetValueAtIndex(CurrentLineIndex);
           switch (mode)
           {
                case StepMode.In:
                {
                     ExecuteStatement(currentLine.statement);
-                    ++LineKeyIndex;
+                    ++CurrentLineIndex;
                     if (!CanRun())
                     { break; }
-                    if (Program.GetValueAtIndex(LineKeyIndex).statement.StatementType == StatementType.Rem)
+                    if (Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
                     { SkipComments(); }
                     break;
                }
@@ -248,17 +312,17 @@ public class DebugEnvironment : TinyBasicEnvironment
                     { goto case StepMode.In; }
                     
                     ExecuteStatement(currentLine.statement);
-                    ++LineKeyIndex;
+                    ++CurrentLineIndex;
                     if (!CanRun())
                     { break; }
-                    if (Program.GetValueAtIndex(LineKeyIndex).statement.StatementType == StatementType.Rem)
+                    if (Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
                     {
                          SkipComments();
                          if (!CanRun())
                          { break; }
                     }
                     RunFrame(ignoreBreakpoints);
-                    if (CanRun() && Program.GetValueAtIndex(LineKeyIndex).statement.StatementType == StatementType.Rem)
+                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
                     { SkipComments(); }
                     break;
                }
@@ -268,12 +332,13 @@ public class DebugEnvironment : TinyBasicEnvironment
                     { break; }
                     
                     RunFrame(ignoreBreakpoints);
-                    if (CanRun() && Program.GetValueAtIndex(LineKeyIndex).statement.StatementType == StatementType.Rem)
+                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
                     { SkipComments(); }
                     break;
                }
           }
-          await PrintProgram();
+          await _emitter.EnsureConnected();
+          await _emitter.UpdateCurrentLine(CurrentLineIndex);
      }
 
      private void RunFrame(bool ignoreBreakpoints)
@@ -281,13 +346,13 @@ public class DebugEnvironment : TinyBasicEnvironment
           var currentFrame = ReturnStack.Count;
           while (CanRun() && currentFrame <= ReturnStack.Count)
           {
-               var line = Program.GetValueAtIndex(LineKeyIndex);
+               var line = Program.GetValueAtIndex(CurrentLineIndex);
                ExecuteStatement(line.statement);
-               ++LineKeyIndex;
+               ++CurrentLineIndex;
                if (!ignoreBreakpoints)
                {
-                    var label = Program.GetKeyAtIndex(LineKeyIndex);
-                    if (_breakPoints.Contains(label))
+                    // var label = Program.GetKeyAtIndex(LineKeyIndex);
+                    if (_breakPoints.Contains(Program.GetKeyAtIndex(CurrentLineIndex)))
                     { return; }
                }
           }
@@ -295,14 +360,13 @@ public class DebugEnvironment : TinyBasicEnvironment
 
      private void RunTo(short lineNumber, bool ignoreBreakpoints)
      {
-          var label = Program.GetKeyAtIndex(LineKeyIndex);
-          while (CanRun() && label != lineNumber)
+          var lineIndex = Program.IndexOfKey(lineNumber);
+          while (CanRun() && CurrentLineIndex != lineIndex)
           {
-               var line = Program.GetValueAtIndex(LineKeyIndex);
+               var line = Program.GetValueAtIndex(CurrentLineIndex);
                ExecuteStatement(line.statement);
-               ++LineKeyIndex;
-               label = Program.GetKeyAtIndex(LineKeyIndex);
-               if (!ignoreBreakpoints && _breakPoints.Contains(label))
+               ++CurrentLineIndex;
+               if (!ignoreBreakpoints && _breakPoints.Contains(Program.GetKeyAtIndex(CurrentLineIndex)))
                { return; }
           }
      }
@@ -324,7 +388,7 @@ public class DebugEnvironment : TinyBasicEnvironment
           }
      }
 
-     private bool CanRun() => IsRunning && LineKeyIndex < Program.Count;
+     private bool CanRun() => IsRunning && CurrentLineIndex < Program.Count;
 
      private void PrintMemory(char? address)
      {
@@ -350,7 +414,7 @@ public class DebugEnvironment : TinyBasicEnvironment
      private void SkipComments()
      {
           do
-          { ++LineKeyIndex; } 
-          while(LineKeyIndex < Program.Count && Program.GetValueAtIndex(LineKeyIndex).statement.StatementType == StatementType.Rem);
+          { ++CurrentLineIndex; } 
+          while(CurrentLineIndex < Program.Count && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem);
      }
 }

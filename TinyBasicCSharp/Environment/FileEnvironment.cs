@@ -20,30 +20,30 @@ public class FileEnvironment : TinyBasicEnvironment
         }
 
         var parser = new LineParser(tokens);
-        LineKeyIndex = 1;
+        CurrentLineIndex = 1;
         while (parser.CanReadLine())
         {
             if (!parser.ParseLine(out Statement statement, out string? error))
             {
-                int lineNumber = statement.Label ?? LineKeyIndex;
+                int lineNumber = statement.Label ?? CurrentLineIndex;
                 Console.WriteLine($"Line {lineNumber}: Syntax error:\n >{error}");
                 return;
             }
 
             if (statement is { Label: null, StatementType: StatementType.Newline })
             { continue; }
-            AddStatement(statement);
+            UpdateProgram(statement);
         }
     }
 
     public void ExecuteLoadedFile() => ExecuteProgram();
 
-    protected override void AddStatement(Statement statement)
+    protected override void UpdateProgram(Statement statement)
     {
         var label = statement.Label;
         if (label != null)
         {
-            base.AddStatement(statement);
+            base.UpdateProgram(statement);
             return;
         }
 
