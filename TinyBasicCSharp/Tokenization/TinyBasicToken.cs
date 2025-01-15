@@ -63,7 +63,7 @@ public class ValueToken : TinyBasicToken
     
     public string Value { get; init; } = string.Empty;
 
-    public override string ToString() => Value;
+    public override string ToString() => Type == TokenType.QuotedString ? $"\"{Value}\"" : Value;
 }
 
 /// <summary>

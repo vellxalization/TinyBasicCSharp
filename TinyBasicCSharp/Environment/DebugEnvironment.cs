@@ -207,7 +207,6 @@ public class DebugEnvironment : TinyBasicEnvironment
      {
           while (CanRun())
           {
-               // var label = Program.GetKeyAtIndex(LineKeyIndex);
                if (_breakPoints.Contains(Program.GetKeyAtIndex(CurrentLineIndex)))
                { return; }
                
@@ -281,7 +280,6 @@ public class DebugEnvironment : TinyBasicEnvironment
 
      private async Task InterruptExecution()
      {
-          // await _emitter.SendInitialState(_breakPoints, CurrentLineIndex, Program);
           while (CanRun())
           { await _cli.RequestAndExecuteAsync(true); }
 
@@ -349,12 +347,10 @@ public class DebugEnvironment : TinyBasicEnvironment
                var line = Program.GetValueAtIndex(CurrentLineIndex);
                ExecuteStatement(line.statement);
                ++CurrentLineIndex;
-               if (!ignoreBreakpoints)
-               {
-                    // var label = Program.GetKeyAtIndex(LineKeyIndex);
-                    if (_breakPoints.Contains(Program.GetKeyAtIndex(CurrentLineIndex)))
-                    { return; }
-               }
+               if (ignoreBreakpoints) 
+               { continue; }
+               if (_breakPoints.Contains(Program.GetKeyAtIndex(CurrentLineIndex)))
+               { return; }
           }
      }
 

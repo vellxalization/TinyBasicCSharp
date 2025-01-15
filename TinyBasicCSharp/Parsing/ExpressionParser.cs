@@ -9,8 +9,7 @@ public class ExpressionParser
     /// Matches all possible expression tokens (operators, variables, numbers, function calls) and returns span of them.
     /// </summary>
     /// <param name="line">Array of tokens</param>
-    /// <param name="start">Reference to the int pointer from where method will try to select the expression.
-    /// Will be incremented in the process</param>
+    /// <param name="start">Reference to the int pointer from where method will try to select the expression. </param>
     /// <returns>Span of the original array</returns>
     public static Span<TinyBasicToken> SelectExpressionFromLine(TinyBasicToken[] line, int start)
     {

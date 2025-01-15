@@ -17,8 +17,6 @@ public class TinyBasicEnvironment
     protected readonly Stack<short> ReturnStack = new();
     private readonly Queue<short> _inputQueue = new();
 
-    public DebugEnvironment CreateDebugEnvironment() => new(Program); 
-
     public TinyBasicEnvironment()
     {
         CancelHandler = (_, args) =>
@@ -33,18 +31,20 @@ public class TinyBasicEnvironment
         _evaluator = new ExpressionEvaluator(Memory);
     }
     
+    /// <summary>
+    /// Creates a debugging environment from this instance of environment
+    /// </summary>
+    /// <returns></returns>
+    public DebugEnvironment CreateDebugEnvironment() => new(Program); 
+    
+    /// <summary>
+    /// Method for executing single isolated line of TinyBasic code. If it's not labeled - it will be executed immediately.
+    /// Otherwise - put in the stack to be executed with RunProgram() method
+    /// </summary>
+    /// <param name="line">Line of TinyBasic code</param>
     public void ExecuteDirectly(string line)
     {
-        var lexer = new Lexer(line);
-        TinyBasicToken[] tokens;
-        try
-        { tokens = lexer.Tokenize(); }
-        catch (TokenizationException ex)
-        {
-            Console.WriteLine($"Syntax error:\n >{ex.Message}");
-            return;
-        }
-        
+        var tokens = TokenizeInput(line);
         if (tokens.Length == 0 || tokens[0].Type is TokenType.NewLine)
         { return; }
         
@@ -56,14 +56,26 @@ public class TinyBasicEnvironment
         }
         
         if (statement.Label is not null)
+        { UpdateProgram(statement); }
+        else
         {
-            UpdateProgram(statement); 
-            return;
+            try
+            { ExecuteStatement(statement); }
+            catch (RuntimeException ex)
+            { Console.WriteLine($"Runtime error: {ex.Message}"); }
         }
+    }
+
+    private static TinyBasicToken[] TokenizeInput(string input)
+    {
+        var lexer = new Lexer(input);
         try
-        { ExecuteStatement(statement); }
-        catch (RuntimeException ex)
-        { Console.WriteLine($"Runtime error: {ex.Message}"); }
+        { return lexer.Tokenize(); }
+        catch (TokenizationException ex)
+        {
+            Console.WriteLine($"Syntax error:\n >{ex.Message}");
+            return [];
+        }
     }
 
     protected virtual void UpdateProgram(Statement statement)
@@ -73,13 +85,12 @@ public class TinyBasicEnvironment
         { throw new ArgumentException("Can't add statement without a label"); }
 
         if (statement.StatementType is StatementType.Newline)
+        { Program.Remove(label.Value); }
+        else
         {
-            Program.Remove(label.Value);
-            return;
+            if (!Program.TryAdd(label.Value, (statement, true)))
+            { Program[label.Value] = (statement, true); }
         }
-
-        if (!Program.TryAdd(label.Value, (statement, true)))
-        { Program[label.Value] = (statement, true); }
     }
     
     protected void ExecuteStatement(Statement statement)
@@ -105,12 +116,12 @@ public class TinyBasicEnvironment
             }
             case StatementType.Goto:
             {
-                GoToLabel(statement, false);
+                GoToLabel(arguments, false);
                 return;
             }
             case StatementType.Gosub:
             {
-                GoToLabel(statement, true);
+                GoToLabel(arguments, true);
                 return;
             }
             case StatementType.Return:
@@ -152,7 +163,7 @@ public class TinyBasicEnvironment
 
     protected void TerminateExecution()
     {
-        CurrentLineIndex = -2;
+        CurrentLineIndex = short.MinValue;
         IsRunning = false;
     }
 
@@ -163,29 +174,7 @@ public class TinyBasicEnvironment
 
         CurrentLineIndex = lineNumber;
     }
-
-    private void ExecuteInput(TinyBasicToken[] arguments)
-    {
-        List<char> addresses = new();
-        foreach (TinyBasicToken token in arguments)
-        {
-            switch (token.Type)
-            {
-                case TokenType.Comma:
-                { continue; }
-                case TokenType.String:
-                {
-                    char address = char.Parse(token.ToString());
-                    addresses.Add(address);
-                    continue;
-                }
-                default:
-                { throw new RuntimeException($"Got unexpected token in variable list: {token}"); }
-            }
-        }
-        LoadAddressesWithValues(addresses);
-    }
-
+    
     private void ExecuteLet(TinyBasicToken[] arguments)
     {
         char address = char.Parse(arguments[0].ToString());
@@ -208,12 +197,26 @@ public class TinyBasicEnvironment
         var nextStatement = (Statement)arguments[^1];
         ExecuteStatement(nextStatement);
     }
+    
+    private bool CheckCondition(short value1, short value2, TinyBasicToken op)
+    {
+        return op.Type switch
+        {
+            TokenType.OperatorGreaterThan => value1 > value2,
+            TokenType.OperatorGreaterThanOrEqual => value1 >= value2,
+            TokenType.OperatorLessThan => value1 < value2,
+            TokenType.OperatorLessThanOrEqual => value1 <= value2,
+            TokenType.OperatorEquals => value1 == value2,
+            TokenType.OperatorNotEqual => value1 != value2,
+            _ => throw new Exception("Unknown operator")
+        };
+    }
 
     protected void Clear()
     {
+        TerminateExecution();
         _inputQueue.Clear();
         ReturnStack.Clear();
-        CurrentLineIndex = -2    ;
         Program.Clear();
     }
 
@@ -246,17 +249,41 @@ public class TinyBasicEnvironment
         { Console.WriteLine(statement); }
     }
 
-    private void GoToLabel(Statement statement, bool isSubroutine)
+    private void GoToLabel(TinyBasicToken[] arguments, bool isSubroutine)
     {
-        var labelToken = (ValueToken)statement.Arguments[0];
+        var labelToken = (ValueToken)arguments[0];
         short label = short.Parse(labelToken.ToString());
-        if ((!Program.TryGetValue(label, out var instruction)) || (!instruction.isLabeled))
+        if (!Program.TryGetValue(label, out var instruction) || !instruction.isLabeled)
         { throw new RuntimeException($"Label {label} does not exist"); }
 
         if (isSubroutine)
         { ReturnStack.Push(CurrentLineIndex); }
         
         CurrentLineIndex = (short)(Program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
+    }
+    
+    private void ExecuteInput(TinyBasicToken[] arguments)
+    {
+        List<char> addresses = new();
+        foreach (TinyBasicToken token in arguments)
+        {
+            switch (token.Type)
+            {
+                case TokenType.Comma:
+                { continue; }
+                case TokenType.String:
+                {
+                    char address = char.Parse(token.ToString());
+                    addresses.Add(address);
+                    continue;
+                }
+                default:
+                { throw new RuntimeException($"Got unexpected token in variable list: {token}"); }
+            }
+        }
+        if (addresses.Count == 0)
+        { return; }
+        LoadAddressesWithValues(addresses);
     }
     
     private void LoadAddressesWithValues(List<char> addresses)
@@ -271,7 +298,7 @@ public class TinyBasicEnvironment
                 continue;
             }
 
-            var input = RequestInput();
+            var input = RequestValuesForInput();
             foreach (var expression in input)
             {
                 try
@@ -286,28 +313,19 @@ public class TinyBasicEnvironment
         }
     }
 
-    private ExpressionToken[] RequestInput()
+    private ExpressionToken[] RequestValuesForInput()
     {
         Console.WriteLine('?');
         string? input = Console.ReadLine();
         if (string.IsNullOrEmpty(input))
         { return []; }
-        
-        var lexer = new Lexer(input);
-        TinyBasicToken[] tokens;
-        try
-        { tokens = lexer.Tokenize(); }
-        catch (TokenizationException ex)
-        {
-            Console.WriteLine($"Syntax error:\n >{ex.Message}");
-            return [];
-        }
+
+        var tokens = TokenizeInput(input);
+        if (tokens.Length == 0) // shouldn't be possible but still check just in case
+        { return []; }
 
         try
-        {
-            var inputExpressions = ParseInput(tokens);
-            return inputExpressions;
-        }
+        { return ParseInput(tokens); }
         catch (ParsingException ex)
         {
             Console.WriteLine($"Error parsing INPUT expression:\n >{ex.Message}");
@@ -324,10 +342,10 @@ public class TinyBasicEnvironment
             var token = input[pointer];
             if (token.Type is TokenType.Comma)
             {
-                if (pointer + 1 >= input.Length)
-                { throw new ParsingException("Expected next expression after the comma"); }
-
                 ++pointer;
+                if (pointer >= input.Length)
+                { throw new ParsingException("Expected next expression after the comma"); }
+                
                 continue;
             }
             var expressionSpan = ExpressionParser.SelectExpressionFromLine(input, pointer);
@@ -353,7 +371,8 @@ public class TinyBasicEnvironment
                 { continue; }
                 case TokenType.QuotedString:
                 {
-                    builder.Append(token);
+                    var unquotedString = token.ToString().Trim('"');
+                    builder.Append(unquotedString);
                     break;
                 }
                 case TokenType.Expression:
@@ -365,21 +384,6 @@ public class TinyBasicEnvironment
                 { throw new RuntimeException($"Got unexpected token type in expression list: {token}"); }
             }
         }
-      
         return builder.ToString();
-    }
-    
-    private bool CheckCondition(short value1, short value2, TinyBasicToken op)
-    {
-        return op.Type switch
-        {
-            TokenType.OperatorGreaterThan => value1 > value2,
-            TokenType.OperatorGreaterThanOrEqual => value1 >= value2,
-            TokenType.OperatorLessThan => value1 < value2,
-            TokenType.OperatorLessThanOrEqual => value1 <= value2,
-            TokenType.OperatorEquals => value1 == value2,
-            TokenType.OperatorNotEqual => value1 != value2,
-            _ => throw new Exception("Unknown operator") // will be caught by parser, exists just to close default case
-        };
     }
 }
