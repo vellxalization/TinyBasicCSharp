@@ -23,7 +23,6 @@ public class PipeEmitter
 
     public async Task EnsureConnected()
     {
-        Console.WriteLine("Ensuring");
         if (_process is { HasExited: false } && _stream is { IsConnected: true })
         { return; }
 
@@ -33,6 +32,7 @@ public class PipeEmitter
             { await _writer.DisposeAsync(); }
             _process?.Kill();
             _process?.Dispose();
+            _process = null;
             StartProcess();
         }
 
@@ -117,5 +117,6 @@ public class PipeEmitter
         
         _process?.Kill();
         _process?.Dispose();
+        _process = null;
     }
 }

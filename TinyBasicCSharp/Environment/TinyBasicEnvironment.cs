@@ -54,7 +54,20 @@ public class TinyBasicEnvironment
             Console.WriteLine($"Syntax error:\n >{error}");
             return;
         }
-        
+        ExecuteDirectly(statement);
+    }
+
+    /// <summary>
+    /// Stops execution of the current program
+    /// </summary>
+    public void TerminateExecution()
+    {
+        CurrentLineIndex = short.MinValue;
+        IsRunning = false;
+    }
+    
+    protected void ExecuteDirectly(Statement statement)
+    {
         if (statement.Label is not null)
         { UpdateProgram(statement); }
         else
@@ -65,8 +78,8 @@ public class TinyBasicEnvironment
             { Console.WriteLine($"Runtime error: {ex.Message}"); }
         }
     }
-
-    private static TinyBasicToken[] TokenizeInput(string input)
+    
+    protected TinyBasicToken[] TokenizeInput(string input)
     {
         var lexer = new Lexer(input);
         try
@@ -160,13 +173,7 @@ public class TinyBasicEnvironment
             { throw new RuntimeException("Tried to execute unknown command"); }
         }
     }
-
-    protected void TerminateExecution()
-    {
-        CurrentLineIndex = short.MinValue;
-        IsRunning = false;
-    }
-
+    
     private void ExecuteReturn()
     {
         if (!ReturnStack.TryPop(out short lineNumber))

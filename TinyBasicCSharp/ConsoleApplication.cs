@@ -8,17 +8,13 @@ namespace TinyCompilerForTinyBasic;
 public class ConsoleApplication
 {
     private TinyBasicEnvironment _environment = new();
-    private ConsoleInterface<ConsoleApplication> _cli;
+    private ConsoleInterface _cli;
     private bool _isRunning = false;
     public ConsoleApplication()
     {
-        _cli = new ConsoleInterface<ConsoleApplication>(this)
+        _cli = new ConsoleInterface()
         {
             InputRequestPrefix = "(APP)> ",
-            Fallback = (application, command) =>
-            {
-                application._environment.ExecuteDirectly(string.Join(' ', command.Signature, string.Join(' ', command.Arguments)));
-            }
         };
         Console.CancelKeyPress += _environment.CancelHandler;
         RegisterCommands();
@@ -26,10 +22,10 @@ public class ConsoleApplication
 
     private void RegisterCommands()
     {
-        _cli.RegisterCommand("help", (application, command) => application.PrintHelp(command.Arguments));
-        _cli.RegisterCommand("execute", (application, command) => application.ExecuteFile(command.Arguments));
-        _cli.RegisterCommand("debug", async (application, command) => await application.Debug(command.Arguments));
-        _cli.RegisterCommand("exit", (application, _) => application._isRunning = false);
+        _cli.RegisterCommand("help", (command) => PrintHelp(command.Arguments));
+        _cli.RegisterCommand("execute", (command) => ExecuteFile(command.Arguments));
+        _cli.RegisterCommand("debug", async (command) => await Debug(command.Arguments));
+        _cli.RegisterCommand("exit", (_) => _environment.TerminateExecution());
     }
     
     private void ExecuteFile(string[] args)
@@ -62,7 +58,15 @@ public class ConsoleApplication
         Manual.PrintGreetings();
         _isRunning = true;
         while (_isRunning)
-        { await _cli.RequestAndExecuteAsync(true); }
+        {
+            var commandRequest = await _cli.RequestAndExecuteAsync();
+            if (commandRequest.executed)
+            { continue; }
+            if (commandRequest.command == null)
+            { continue; }
+            _environment.ExecuteDirectly(string.Join(' ', commandRequest.command.Signature,
+                string.Join(' ', commandRequest.command.Arguments)));
+        }
     }
 
     private Task Debug(string[] args)
