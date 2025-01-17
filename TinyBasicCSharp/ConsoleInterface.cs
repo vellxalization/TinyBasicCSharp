@@ -2,49 +2,43 @@ using System.Text.RegularExpressions;
 
 namespace TinyCompilerForTinyBasic;
 
-public class ConsoleInterface<T>
+public class ConsoleInterface
 {
     public string? InputRequestPrefix { get; init; } = null;
-    public Action<T, ConsoleCommand>? Fallback { get; init; }
-    private readonly Dictionary<string, Action<T, ConsoleCommand>> _availableCommands = new();
-    private readonly Dictionary<string, Func<T, ConsoleCommand, Task>> _asyncCommands = new();
-    private T _helpers;
+    private readonly Dictionary<string, Action<ConsoleCommand>> _availableCommands = new();
+    private readonly Dictionary<string, Func<ConsoleCommand, Task>> _asyncCommands = new();
     
-    public ConsoleInterface(T helpers) => _helpers = helpers;
-    
-    public void RequestAndExecute(bool retryIfFailed)
+    /// <summary>
+    /// Requests and tries to execute command
+    /// </summary>
+    /// <returns>bool - has any command been executed;
+    /// ConsoleCommand? - attempted command</returns>
+    public (bool, ConsoleCommand?) RequestAndExecute()
     {
-        START:
         var command = RequestInput();
-        if (command is null && retryIfFailed)
-        { goto START; }
-        try
-        { ExecuteCommand(command!); }
-        catch (ArgumentException ex)
-        {
-            Console.WriteLine(ex.Message);
-            if (retryIfFailed)
-            { goto START; }
-        }
+        if (command is null)
+        { return (false, null); }
+        
+        var result = ExecuteCommand(command);
+        return (result, command);
     }
     
-    public async Task RequestAndExecuteAsync(bool retryIfFailed)
+    /// <summary>
+    /// Requests and tries to execute command asynchronously
+    /// </summary>
+    /// <returns>bool - has any command been executed;
+    /// ConsoleCommand? - attempted command</returns>
+    public async Task<(bool executed, ConsoleCommand? command)> RequestAndExecuteAsync()
     {
-        START:
         var command = RequestInput();
-        if (command is null && retryIfFailed)
-        { goto START; }
-        try
-        { await ExecuteCommandAsync(command!); }
-        catch (ArgumentException ex)
-        {
-            Console.WriteLine(ex.Message);
-            if (retryIfFailed)
-            { goto START; }
-        }
+        if (command is null)
+        { return (false, null); }
+        
+        var result = await ExecuteCommandAsync(command);
+        return (result, command);
     }
     
-    public void RegisterCommand(string signature, Action<T, ConsoleCommand> action)
+    public void RegisterCommand(string signature, Action<ConsoleCommand> action)
     {
         if (string.IsNullOrWhiteSpace(signature))
         { throw new ArgumentException("Command signature can't be empty"); }
@@ -52,7 +46,7 @@ public class ConsoleInterface<T>
         _availableCommands.Add(signature, action);
     }
     
-    public void RegisterCommand(string signature, Func<T, ConsoleCommand, Task> func)
+    public void RegisterCommand(string signature, Func<ConsoleCommand, Task> func)
     {
         if (string.IsNullOrWhiteSpace(signature))
         { throw new ArgumentException("Command signature can't be empty"); }
@@ -60,35 +54,27 @@ public class ConsoleInterface<T>
         _asyncCommands.Add(signature, func);
     }
     
-    private void ExecuteCommand(ConsoleCommand command)
+    private bool ExecuteCommand(ConsoleCommand command)
     {
-        if (_availableCommands.TryGetValue(command.Signature, out var action))
-        {
-            action.Invoke(_helpers, command);
-            return;
-        }
-        
-        if (Fallback is null)
-        { throw new ArgumentException($"Tried to execute unregistered command with no fallback provided: {command.Signature}"); }
-        Fallback(_helpers, command);
+        if (!_availableCommands.TryGetValue(command.Signature, out var action)) 
+        {  return false; }
+        action.Invoke(command);
+        return true;
     }
     
-    private Task ExecuteCommandAsync(ConsoleCommand command)
+    private async Task<bool> ExecuteCommandAsync(ConsoleCommand command)
     {
         if (_asyncCommands.TryGetValue(command.Signature, out var asyncAction))
-        { return asyncAction(_helpers, command); }
-
+        {
+            await asyncAction(command);
+            return true;
+        }
         if (_availableCommands.TryGetValue(command.Signature, out var action))
         {
-            action.Invoke(_helpers, command);
-            return Task.CompletedTask;
+            action.Invoke(command);
+            return true;
         }
-
-        if (Fallback is null)
-        { throw new ArgumentException($"Tried to execute unregistered command with no fallback provided: {command.Signature}"); }
-        
-        Fallback(_helpers, command);
-        return Task.CompletedTask;
+        return false;
     }
     
     private ConsoleCommand? RequestInput()
