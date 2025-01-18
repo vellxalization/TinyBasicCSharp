@@ -221,7 +221,8 @@ public class LineParser
             ++_pointer;
             next = Peek();
         }
-
+        if (builder.Length > 0)
+        { builder.Remove(builder.Length - 1, 1); }
         return [new ValueToken(TokenType.QuotedString, builder.ToString())];
     }
     
@@ -229,6 +230,8 @@ public class LineParser
     {
         List<TinyBasicToken> arguments = [];
         var expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
+        if (expressionSpan.Length == 0)
+        { throw new UnexpectedOrEmptyTokenException($"Expected an expression, got: {_tokens[_pointer + 1]}"); }
         ExpressionToken expression;
         try
         { expression = ExpressionParser.ParseExpression(expressionSpan); }
@@ -250,6 +253,8 @@ public class LineParser
         { throw new UnexpectedOrEmptyTokenException("Expected an expression after comparison operator"); }
         
         expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
+        if (expressionSpan.Length == 0)
+        { throw new UnexpectedOrEmptyTokenException($"Expected an expression, got: {_tokens[_pointer + 1]}"); }
         try
         { expression = ExpressionParser.ParseExpression(expressionSpan); }
         catch (ParsingException ex)
@@ -305,7 +310,7 @@ public class LineParser
                 default:
                 {
                     var expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
-                    if (expressionSpan.Length < 1)
+                    if (expressionSpan.Length == 0)
                     { throw new ParsingException($"Expected an expression, got {next}"); }
                     try
                     { 
@@ -387,6 +392,8 @@ public class LineParser
         { throw new UnexpectedOrEmptyTokenException("Expected an expression after assignment operator"); }
         
         var expressionSpan = ExpressionParser.SelectExpressionFromLine(_tokens, _pointer + 1);
+        if (expressionSpan.Length == 0)
+        { throw new ParsingException($"Expected an expression, got {next}"); }
         try
         {
             var expression = ExpressionParser.ParseExpression(expressionSpan);

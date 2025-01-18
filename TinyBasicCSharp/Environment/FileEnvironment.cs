@@ -8,19 +8,12 @@ public class FileEnvironment : TinyBasicEnvironment
     public void LoadFile(string sourceCode)
     {
         Clear();
-        var lexer = new Lexer(sourceCode);
-        TinyBasicToken[] tokens;
-
-        try
-        { tokens = lexer.Tokenize(); }
-        catch (TokenizationException ex)
-        {
-            Console.WriteLine($"Syntax error:\n >{ex.Message}");
-            return;
-        }
-
+        var tokens = TokenizeInput(sourceCode);
+        if (tokens.Length == 0)
+        { return; }
+        
         var parser = new LineParser(tokens);
-        CurrentLineIndex = 1;
+        CurrentLineIndex = 1; // we use it here and only here, not as an index, but as a label 
         while (parser.CanReadLine())
         {
             if (!parser.ParseLine(out Statement statement, out string? error))
@@ -44,12 +37,13 @@ public class FileEnvironment : TinyBasicEnvironment
         if (label != null)
         {
             base.UpdateProgram(statement);
+            CurrentLineIndex = (short)(label.Value + 1);
             return;
         }
 
         if (statement.StatementType == StatementType.Newline)
         { throw new ArgumentException("Statement must have a label or shouldn't be a new line"); }
-        var lastLabel = Program.Count == 0 ? (short)0 : Program.GetKeyAtIndex(Program.Count - 1);
-        Program[(short)(lastLabel + 1)] = (statement, false);
+        ++CurrentLineIndex;
+        Program[CurrentLineIndex] = (statement, false);
     }
 }
