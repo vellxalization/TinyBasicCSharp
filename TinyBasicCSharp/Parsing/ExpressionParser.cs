@@ -22,11 +22,19 @@ public class ExpressionParser
             var token = line[pointerCopy];
             switch (token.Type)
             {
-                case TokenType.ParenthesisClose or TokenType.ParenthesisOpen or
-                    TokenType.OperatorPlus or TokenType.OperatorMinus or
-                    TokenType.OperatorDivision or TokenType.OperatorMultiplication or
-                    TokenType.Number:
+                case TokenType.ParenthesisClose:
+                case TokenType.ParenthesisOpen:
+                case TokenType.Number:
                 {
+                    ++pointerCopy;
+                    break;
+                }
+                case TokenType.Operator:
+                {
+                    var op = token as OperatorToken;
+                    if (op?.OperatorType is OperatorType.GreaterThan or OperatorType.GreaterThanOrEqual 
+                        or OperatorType.LessThanOrEqual or OperatorType.LessThan or OperatorType.Equals or OperatorType.NotEqual)
+                    { return line.AsSpan(start, pointerCopy - start); }
                     ++pointerCopy;
                     break;
                 }
@@ -75,8 +83,8 @@ public class ExpressionParser
         
         while (pointer + 1 < selectedTokens.Length)
         {
-            var op = selectedTokens[pointer + 1];
-            if (op.Type is not (TokenType.OperatorPlus or TokenType.OperatorMinus))
+            var op = selectedTokens[pointer + 1] as OperatorToken;
+            if (op?.OperatorType is not (OperatorType.Plus or OperatorType.Minus))
             { return; }
             finalExpression.Add(op);
             
@@ -95,8 +103,8 @@ public class ExpressionParser
         
         while (pointer + 1 < selectedTokens.Length)
         {
-            var op = selectedTokens[pointer + 1];
-            if (op.Type is not (TokenType.OperatorDivision or TokenType.OperatorMultiplication))
+            var op = selectedTokens[pointer + 1] as OperatorToken;
+            if (op?.OperatorType is not (OperatorType.Division or OperatorType.Multiplication))
             { return; }
             finalExpression.Add(op);
             
@@ -112,7 +120,7 @@ public class ExpressionParser
     private static void ParseFactor(Span<TinyBasicToken> selectedTokens, ref int pointer, List<TinyBasicToken> finalExpression)
     {
         var token = selectedTokens[pointer];
-        while (token.Type is TokenType.OperatorPlus or TokenType.OperatorMinus)
+        while (token is OperatorToken op && op.OperatorType is (OperatorType.Plus or OperatorType.Minus))
         {
             finalExpression.Add(token);
             ++pointer;

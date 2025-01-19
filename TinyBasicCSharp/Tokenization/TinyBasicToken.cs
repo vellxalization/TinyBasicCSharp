@@ -23,26 +23,6 @@ public class TinyBasicToken
             { return ","; }
             case TokenType.NewLine:
             { return "\n"; }
-            case TokenType.OperatorPlus:
-            { return "+"; }
-            case TokenType.OperatorMinus:
-            { return "-"; }
-            case TokenType.OperatorMultiplication:
-            { return "*"; }
-            case TokenType.OperatorDivision:
-            { return "/"; }
-            case TokenType.OperatorGreaterThan:
-            { return ">"; }
-            case TokenType.OperatorGreaterThanOrEqual:
-            { return ">="; }
-            case TokenType.OperatorLessThan:
-            { return "<"; }
-            case TokenType.OperatorLessThanOrEqual:
-            { return "<="; }
-            case TokenType.OperatorEquals:
-            { return "="; }
-            case TokenType.OperatorNotEqual:
-            { return "<>"; }
             case TokenType.ParenthesisOpen:
             { return "("; }
             case TokenType.ParenthesisClose:
@@ -50,6 +30,34 @@ public class TinyBasicToken
             default:
             { return base.ToString()!; }
         }
+    }
+}
+
+public class OperatorToken : TinyBasicToken
+{
+    public OperatorToken(OperatorType opType) : base(TokenType.Operator)
+    {
+        OperatorType = opType;
+    }
+
+    public OperatorType OperatorType { get; init; }
+
+    public override string ToString()
+    {
+        return OperatorType switch
+        {
+            OperatorType.Plus => "+",
+            OperatorType.Minus => "-",
+            OperatorType.Multiplication => "*",
+            OperatorType.Division => "/",
+            OperatorType.Equals => "=",
+            OperatorType.NotEqual => "<>",
+            OperatorType.GreaterThan => ">",
+            OperatorType.GreaterThanOrEqual => ">=",
+            OperatorType.LessThan => "<",
+            OperatorType.LessThanOrEqual => "<=",
+            _ => base.ToString()
+        };
     }
 }
 
@@ -181,17 +189,22 @@ public enum TokenType
     QuotedString,
     ParenthesisOpen,
     ParenthesisClose,
-    OperatorPlus,
-    OperatorMinus,
-    OperatorMultiplication,
-    OperatorDivision,
-    OperatorEquals,
-    OperatorNotEqual,
-    OperatorGreaterThan,
-    OperatorGreaterThanOrEqual,
-    OperatorLessThan,
-    OperatorLessThanOrEqual,
+    Operator,
     Expression,
     Function,
     Statement
+}
+
+public enum OperatorType
+{
+    Plus,
+    Minus,
+    Multiplication,
+    Division,
+    Equals,
+    NotEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
 }

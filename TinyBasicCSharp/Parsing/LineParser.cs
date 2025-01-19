@@ -241,9 +241,7 @@ public class LineParser
         arguments.Add(expression);
 
         TinyBasicToken? next = Peek();
-        if (next?.Type is not (TokenType.OperatorGreaterThan or TokenType.OperatorLessThan
-            or TokenType.OperatorGreaterThanOrEqual or TokenType.OperatorLessThanOrEqual
-            or TokenType.OperatorEquals or TokenType.OperatorNotEqual))
+        if (next?.Type != TokenType.Operator)
         { throw new UnexpectedOrEmptyTokenException("Expected a comparison operator after expression"); }
         arguments.Add(next);
         
@@ -382,9 +380,9 @@ public class LineParser
         
         ++_pointer;
         next = Peek();
-        if (next?.Type is not TokenType.OperatorEquals)
+        if (next is not OperatorToken op || op.OperatorType != OperatorType.Equals)
         { throw new UnexpectedOrEmptyTokenException($"Expected an assignment operator after {address} variable"); }
-        arguments.Add(next);
+        arguments.Add(op);
         
         ++_pointer;
         next = Peek();

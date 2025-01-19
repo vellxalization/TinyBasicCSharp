@@ -197,7 +197,7 @@ public class TinyBasicEnvironment
         expression = (ExpressionToken)arguments[2];
         var value2 = _evaluator.EvaluateExpression(expression);
         
-        var op = arguments[1];
+        var op = (OperatorToken)arguments[1];
         if (!CheckCondition(value1, value2, op))
         { return; }
 
@@ -205,16 +205,16 @@ public class TinyBasicEnvironment
         ExecuteStatement(nextStatement);
     }
     
-    private bool CheckCondition(short value1, short value2, TinyBasicToken op)
+    private bool CheckCondition(short value1, short value2, OperatorToken op)
     {
-        return op.Type switch
+        return op.OperatorType switch
         {
-            TokenType.OperatorGreaterThan => value1 > value2,
-            TokenType.OperatorGreaterThanOrEqual => value1 >= value2,
-            TokenType.OperatorLessThan => value1 < value2,
-            TokenType.OperatorLessThanOrEqual => value1 <= value2,
-            TokenType.OperatorEquals => value1 == value2,
-            TokenType.OperatorNotEqual => value1 != value2,
+            OperatorType.GreaterThan => value1 > value2,
+            OperatorType.GreaterThanOrEqual => value1 >= value2,
+            OperatorType.LessThan => value1 < value2,
+            OperatorType.LessThanOrEqual => value1 <= value2,
+            OperatorType.Equals => value1 == value2,
+            OperatorType.NotEqual => value1 != value2,
             _ => throw new Exception("Unknown operator")
         };
     }

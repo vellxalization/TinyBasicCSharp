@@ -31,13 +31,13 @@ public class ExpressionEvaluator
         
         while ((start + 1) < expression.Length)
         {
-            TinyBasicToken op = expression[start + 1];
-            if (op.Type is not (TokenType.OperatorPlus or TokenType.OperatorMinus))
+            var op = expression[start + 1] as OperatorToken;
+            if (op?.OperatorType is not (OperatorType.Plus or OperatorType.Minus))
             { break; }
 
             start += 2;
             short secondValue = EvaluateTerm(expression, ref start);
-            value = op.Type is TokenType.OperatorPlus ? unchecked((short)(value + secondValue)) : unchecked((short)(value - secondValue));
+            value = op.OperatorType is OperatorType.Plus ? unchecked((short)(value + secondValue)) : unchecked((short)(value - secondValue));
         }
         return value;
     }
@@ -48,14 +48,14 @@ public class ExpressionEvaluator
 
         while ((start + 1) < expression.Length)
         {
-            TinyBasicToken op = expression[start + 1];
-            if (op.Type is not (TokenType.OperatorDivision or TokenType.OperatorMultiplication))
+            var op = expression[start + 1] as OperatorToken;
+            if (op?.OperatorType is not (OperatorType.Division or OperatorType.Multiplication))
             { break; }
             
             start += 2;
             short secondValue = EvaluateFactor(expression, ref start);
             
-            if (op.Type is TokenType.OperatorMultiplication)
+            if (op?.OperatorType is OperatorType.Multiplication)
             { value = unchecked((short)(value * secondValue)); } 
             else
             {
@@ -71,9 +71,9 @@ public class ExpressionEvaluator
     {
         bool shouldNegate = false;
         TinyBasicToken token = expression[start];
-        while (token.Type is TokenType.OperatorPlus or TokenType.OperatorMinus)
+        while (token is OperatorToken op && op.OperatorType is (OperatorType.Plus or OperatorType.Minus))
         {
-            if (token.Type is TokenType.OperatorMinus)
+            if (op.OperatorType is OperatorType.Minus)
             { shouldNegate = !shouldNegate; }
 
             ++start;

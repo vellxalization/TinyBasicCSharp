@@ -127,7 +127,6 @@ public class Lexer
         
         return new ValueToken(TokenType.String, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
     }
-    
     /// <summary>
     /// Reads an operator or parenthesis
     /// </summary>
@@ -141,49 +140,49 @@ public class Lexer
             case ')':
             { return new TinyBasicToken(TokenType.ParenthesisClose); }
             case '+':
-            { return new TinyBasicToken(TokenType.OperatorPlus); }
+            { return new OperatorToken(OperatorType.Plus); }
             case '-':
-            { return new TinyBasicToken(TokenType.OperatorMinus); }
+            { return new OperatorToken(OperatorType.Minus); }
             case '*':
-            { return new TinyBasicToken(TokenType.OperatorMultiplication); }
+            { return new OperatorToken(OperatorType.Multiplication); }
             case '/':
-            { return new TinyBasicToken(TokenType.OperatorDivision); }
+            { return new OperatorToken(OperatorType.Division); }
             case '=':
-            { return new TinyBasicToken(TokenType.OperatorEquals); }
+            { return new OperatorToken(OperatorType.Equals); }
             case '>':
             {
                 if (((_pointer + 1) >= _sourceCode.Length))
-                { return new TinyBasicToken(TokenType.OperatorGreaterThan); }
+                { return new OperatorToken(OperatorType.GreaterThan); }
 
                 char nextChar = _sourceCode[_pointer + 1];
                 switch (nextChar)
                 {
                     case '<':
                         ++_pointer;
-                        return new TinyBasicToken(TokenType.OperatorNotEqual);
+                        return new OperatorToken(OperatorType.NotEqual);
                     case '=':
                         ++_pointer;
-                        return new TinyBasicToken(TokenType.OperatorGreaterThanOrEqual);
+                        return new OperatorToken(OperatorType.GreaterThanOrEqual);
                     default:
-                        return new TinyBasicToken(TokenType.OperatorGreaterThan);
+                        return new OperatorToken(OperatorType.GreaterThan);
                 }
             }
             case '<':
             {
                 if (((_pointer + 1) >= _sourceCode.Length))
-                { return new TinyBasicToken(TokenType.OperatorLessThan); }
-
+                { return new OperatorToken(OperatorType.LessThan); }
+                
                 char nextChar = _sourceCode[_pointer + 1];
                 switch (nextChar)
                 {
                     case '>':
                         ++_pointer;
-                        return new TinyBasicToken(TokenType.OperatorNotEqual);
+                        return new OperatorToken(OperatorType.NotEqual);
                     case '=':
                         ++_pointer;
-                        return new TinyBasicToken(TokenType.OperatorLessThanOrEqual);
+                        return new OperatorToken(OperatorType.LessThanOrEqual);
                     default:
-                        return new TinyBasicToken(TokenType.OperatorLessThan);
+                        return new OperatorToken(OperatorType.LessThan);
                 }
             }
             default: // shouldn't ever get here; exists just to close default switch statement
