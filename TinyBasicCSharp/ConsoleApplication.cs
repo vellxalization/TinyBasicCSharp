@@ -30,20 +30,31 @@ public class ConsoleApplication
     
     private void ExecuteFile(string[] args)
     {
-        var env = CreateFileEnvironment(args);
+        var env = CreateFileEnvironment(args[0]);
         env?.ExecuteLoadedFile();
     }
 
-    private FileEnvironment? CreateFileEnvironment(string[] args)
+    private FileEnvironment? CreateFileEnvironment(string path)
     {
-        if (args.Length < 1)
+        if (string.IsNullOrEmpty(path))
         { throw new ArgumentException("No path to file were provided"); }
+
+        var stringPath = path.Trim('"');
+        if (!stringPath.EndsWith(".bas"))
+        {
+            Console.WriteLine("File should be in .bas format");
+            return null;
+        }
         
-        var stringPath = args[0];
-        if (stringPath[0] is '"' && stringPath[^1] is '"')
-        { stringPath = stringPath[1..^2]; }
+        string file;
+        try
+        { file = File.ReadAllText(stringPath); }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            return null;
+        }
         
-        var file = File.ReadAllText(stringPath);
         var fileEnvironment = new FileEnvironment();
         if (!fileEnvironment.LoadFile(file))
         { return null; }
@@ -73,8 +84,8 @@ public class ConsoleApplication
 
     private Task Debug(string[] args)
     {
-        var debugEnvironment = args.Length > 0 ? CreateFileEnvironment(args).CreateDebugEnvironment() : _environment.CreateDebugEnvironment();
-        return debugEnvironment.Debug();
+        var debugEnvironment = args.Length > 0 ? CreateFileEnvironment(args[0])?.CreateDebugEnvironment() : _environment.CreateDebugEnvironment();
+        return debugEnvironment != null ? debugEnvironment.Debug() : Task.CompletedTask;
     }
     
     /// <summary>
@@ -83,13 +94,13 @@ public class ConsoleApplication
     /// <param name="commands">User input separated by space</param>
     private void PrintHelp(string[] commands)
     {
-        if (commands.Length < 2 || string.IsNullOrEmpty(commands[1]))
+        if (commands.Length < 1 || string.IsNullOrEmpty(commands[0]))
         {
             Manual.PrintHelp();
             return;
         }
 
-        switch (commands[1])
+        switch (commands[0])
         {
             case "execute":
                 Manual.PrintHelpExecute();
