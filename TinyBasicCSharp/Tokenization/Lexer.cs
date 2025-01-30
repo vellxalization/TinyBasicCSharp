@@ -1,144 +1,89 @@
-﻿using System.Text;
-
 namespace TinyCompilerForTinyBasic.Tokenization;
 
-/// <summary>
-/// Class for tokenizing a string
-/// </summary>
-public class Lexer
+public static class Lexer
 {
-    public Lexer(string sourceCode) => _sourceCode = sourceCode;
-    private string _sourceCode;
-    private int _pointer = 0;
-
-    /// <summary>
-    /// Tokenizes input from constructor
-    /// </summary>
-    /// <returns>An array of TinyBasic tokens</returns>
-    /// <exception cref="UnmatchedQuotationException">End of input reached without closing quote</exception>
-    public TinyBasicToken[] Tokenize()
+    public static IToken[] Tokenize(string source)
     {
-        var tokens = new List<TinyBasicToken>();
-        
-        while (_pointer < _sourceCode.Length)
+        var tokens = new List<IToken>();
+        int i = 0;
+        while (i < source.Length)
         {
-            char current = _sourceCode[_pointer];
-
-            if (current is '\n')
-            {
-                tokens.Add(new TinyBasicToken(TokenType.NewLine));
-                ++_pointer;
-            }
-            else if (char.IsWhiteSpace(current))
-            { ++_pointer; }
-            else if (current is ',')
-            {
-                tokens.Add(new TinyBasicToken(TokenType.Comma));
-                ++_pointer;
-            }
-            else if (current is '"')
-            {
-                ++_pointer;
-                tokens.Add(ReadQuotedString());
-                ++_pointer;
-            }
-            else if (current is '(' or ')' or '+' or '-' or '*' or '/' or '<' or '>' or '=')
-            {
-                tokens.Add(ReadOperatorOrParenthesis());
-                ++_pointer;
-            }
-            else if (char.IsDigit(current))
-            { tokens.Add(ReadNumber()); }
-            else 
-            { tokens.Add(ReadString()); }
+            var character = source[i];
+            if (char.IsDigit(character))
+            { tokens.Add(GetNumberToken(source, ref i)); }
+            else if (character == '"')
+            { tokens.Add(GetQuotedStringToken(source, ref i)); }
+            else if (character is ('+' or '-' or '*' or '/' or '=' or '<' or '>'))
+            { tokens.Add(GetOperatorToken(source, ref i)); }
+            else if (character is ' ' or '\t')
+            { ++i; }
+            else if (char.IsWhiteSpace(character) || character is ',' or '(' or ')')
+            { tokens.Add(GetServiceToken(source, ref i)); }
+            else
+            { tokens.Add(GetWordToken(source, ref i)); }
         }
-
         return tokens.ToArray();
     }
 
-    /// <summary>
-    /// Used for reading quoted strings.
-    /// Pointer should be moved to the next character after opening quotation mark before calling.
-    /// Stops on the first quotation mark it encounters
-    /// </summary>
-    /// <returns>Value token with quoted string</returns>
-    /// <exception cref="UnmatchedQuotationException">End of input reached without closing quote</exception>
-    private ValueToken ReadQuotedString()
+    private static WordToken GetWordToken(string source, ref int startFrom)
     {
-        int pointerCopy = _pointer;
-
-        char currentChar = ' '; // value is not used; instantly overwritten in the loop below
-        while (_pointer < _sourceCode.Length)
+        int start = startFrom;
+        var character = source[startFrom];
+        while (!char.IsDigit(character) 
+               && !char.IsWhiteSpace(character) 
+               && character is not ('(' or ')' or ',' or '+' or '-' or '*' or '/' or '=' or '<' or '>'))
         {
-            currentChar = _sourceCode[_pointer];
-            if (currentChar is '"' or '\n' or '\r')
-            { break; } 
-            // break from the loop if we've found closing quotation mark, new line OR reached the end of source code
-            ++_pointer;
-        }
-
-        string quotedString = _sourceCode.Substring(pointerCopy, _pointer - pointerCopy);
-        if ((_pointer >= _sourceCode.Length) || (currentChar is '\n' or '\r'))
-        { throw new UnmatchedQuotationException($"Failed to find closing quotation mark for: {quotedString}"); }
-        
-        return new ValueToken(TokenType.QuotedString, quotedString);
-    }
-    
-    /// <summary>
-    /// Used to read numbers.
-    /// Stops at the first letter or space/newline
-    /// </summary>
-    /// <returns>Value token with number</returns>
-    private ValueToken ReadNumber()
-    {
-        int pointerCopy = _pointer;
-        while (_pointer < _sourceCode.Length)
-        {
-            char currentChar = _sourceCode[_pointer];
-            
-            if (char.IsDigit(currentChar))
-            { ++_pointer; }
-            else
+            ++startFrom;
+            if (startFrom >= source.Length) 
             { break; }
-            // break from the loop if we've encountered a non-digit OR reached the end of source code
+            character = source[startFrom];
         }
         
-        return new ValueToken(TokenType.Number, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
+        return new WordToken(source[start..startFrom]);
     }
 
-    /// <summary>
-    /// Used to read strings such as variables and keywords.
-    /// Stops at the first non-letter character
-    /// Any non-reserved symbol (such as '\' or '?') will be treated as string or part of it
-    /// </summary>
-    /// <returns>Value token with string</returns>
-    private ValueToken ReadString()
+    private static NumberToken GetNumberToken(string source, ref int startFrom)
     {
-        int pointerCopy = _pointer;
-        
-        while (_pointer < _sourceCode.Length)
+        int start = startFrom;
+        var character = source[startFrom];
+        while (char.IsDigit(character))
         {
-            char currentChar = _sourceCode[_pointer];
-            if (char.IsWhiteSpace(currentChar) || currentChar is '"' or '(' or ')' or '+' or '-' or '*' or '/' or '<' or '>' or '=' or ',')
-            { break; } 
-            
-            ++_pointer;
+            ++startFrom;
+            if (startFrom >= source.Length)
+            { break; }
+            character = source[startFrom];
         }
         
-        return new ValueToken(TokenType.String, _sourceCode.Substring(pointerCopy, _pointer - pointerCopy));
+        var value = int.Parse(source[start..startFrom]);
+        return new NumberToken(value);
     }
-    /// <summary>
-    /// Reads an operator or parenthesis
-    /// </summary>
-    /// <returns>Token with type according to parsed operator or parenthesis</returns>
-    private TinyBasicToken ReadOperatorOrParenthesis()
+
+    private static QuotedStringToken GetQuotedStringToken(string source, ref int startFrom)
     {
-        switch (_sourceCode[_pointer])
+        if (source[startFrom] != '"')
+        { throw new ArgumentException("Expected to start from quotation mark"); }
+        
+        int start = startFrom;
+        ++startFrom;
+        while (startFrom < source.Length && source[startFrom] is not ('"' or '\r' or '\n'))
+        { ++startFrom; }
+        
+        if (startFrom < source.Length)
+        { ++startFrom; }
+        
+        var value = source[start..startFrom];
+        if (value.Length > 1 && value[^1] == '"')
+        { return new QuotedStringToken(value); }
+        
+        throw new TokenizationException($"Failed to find matching quotation mark for the string: {value}");
+    }
+
+    private static OperatorToken GetOperatorToken(string source, ref int startFrom)
+    {
+        var op = source[startFrom];
+        ++startFrom;
+        switch (op)
         {
-            case '(':
-            { return new TinyBasicToken(TokenType.ParenthesisOpen); }
-            case ')':
-            { return new TinyBasicToken(TokenType.ParenthesisClose); }
             case '+':
             { return new OperatorToken(OperatorType.Plus); }
             case '-':
@@ -149,44 +94,69 @@ public class Lexer
             { return new OperatorToken(OperatorType.Division); }
             case '=':
             { return new OperatorToken(OperatorType.Equals); }
-            case '>':
-            {
-                if (((_pointer + 1) >= _sourceCode.Length))
-                { return new OperatorToken(OperatorType.GreaterThan); }
-
-                char nextChar = _sourceCode[_pointer + 1];
-                switch (nextChar)
-                {
-                    case '<':
-                        ++_pointer;
-                        return new OperatorToken(OperatorType.NotEqual);
-                    case '=':
-                        ++_pointer;
-                        return new OperatorToken(OperatorType.GreaterThanOrEqual);
-                    default:
-                        return new OperatorToken(OperatorType.GreaterThan);
-                }
-            }
             case '<':
             {
-                if (((_pointer + 1) >= _sourceCode.Length))
+                if (startFrom >= source.Length)
                 { return new OperatorToken(OperatorType.LessThan); }
-                
-                char nextChar = _sourceCode[_pointer + 1];
-                switch (nextChar)
+                if (source[startFrom] == '=')
                 {
-                    case '>':
-                        ++_pointer;
-                        return new OperatorToken(OperatorType.NotEqual);
-                    case '=':
-                        ++_pointer;
-                        return new OperatorToken(OperatorType.LessThanOrEqual);
-                    default:
-                        return new OperatorToken(OperatorType.LessThan);
+                    ++startFrom;
+                    return new OperatorToken(OperatorType.LessThanOrEqual);
                 }
+                if (source[startFrom] == '>')
+                {
+                    ++startFrom;
+                    return new OperatorToken(OperatorType.NotEqual);
+                }
+                return new OperatorToken(OperatorType.LessThan);
             }
-            default: // shouldn't ever get here; exists just to close default switch statement
-            { throw new TokenizationException($"Unexpected operator: {_sourceCode[_pointer]}"); } 
+            case '>':
+            {
+                if (startFrom >= source.Length)
+                { return new OperatorToken(OperatorType.GreaterThan); }
+                if (source[startFrom] == '=')
+                {
+                    ++startFrom;
+                    return new OperatorToken(OperatorType.GreaterThanOrEqual);
+                }
+                if (source[startFrom] == '<')
+                {
+                    ++startFrom;
+                    return new OperatorToken(OperatorType.NotEqual);
+                }
+                return new OperatorToken(OperatorType.GreaterThan);
+            }
+            default:
+            { throw new TokenizationException($"Unknown operator: {op}"); }
+        }
+    }
+
+    private static ServiceToken GetServiceToken(string source, ref int startFrom)
+    {
+        var character = source[startFrom];
+        ++startFrom;
+        switch (character)
+        {
+            case '(':
+            { return new ServiceToken(ServiceType.ParenthesisOpen); }
+            case ')':
+            { return new ServiceToken(ServiceType.ParenthesisClose); }
+            case ',':
+            { return new ServiceToken(ServiceType.Comma); }
+            case '\r':
+            {
+                if (source[startFrom] == '\n')
+                { ++startFrom; }
+                return new ServiceToken(ServiceType.Newline);
+            }
+            case '\n':
+            {
+                if (source[startFrom] == '\r')
+                { ++startFrom; }
+                return new ServiceToken(ServiceType.Newline);
+            }
+            default:
+            { throw new TokenizationException($"Unexpected service token: {character}"); }
         }
     }
 }

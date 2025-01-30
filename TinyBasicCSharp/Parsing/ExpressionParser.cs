@@ -9,176 +9,150 @@ public class ExpressionParser
     /// Matches all possible expression tokens (operators, variables, numbers, function calls) and returns span of them.
     /// </summary>
     /// <param name="line">Array of tokens</param>
-    /// <param name="start">Reference to the int pointer from where method will try to select the expression. </param>
+    /// <param name="start">int pointer from where method will try to select the expression. </param>
     /// <returns>Span of the original array</returns>
-    public static Span<TinyBasicToken> SelectExpressionFromLine(TinyBasicToken[] line, int start)
+    public static Span<IToken> SelectExpressionFromLine(Span<IToken> line, int start)
     {
         int pointerCopy = start;
-        while (true)
+        while (pointerCopy < line.Length)
         {
-            if (pointerCopy >= line.Length)
-            { return line.AsSpan(start, pointerCopy - start); }
-
             var token = line[pointerCopy];
-            switch (token.Type)
+            switch (token)
             {
-                case TokenType.ParenthesisClose:
-                case TokenType.ParenthesisOpen:
-                case TokenType.Number:
+                case WordToken word:
                 {
-                    ++pointerCopy;
-                    break;
-                }
-                case TokenType.Operator:
-                {
-                    var op = token as OperatorToken;
-                    if (op?.OperatorType is OperatorType.GreaterThan or OperatorType.GreaterThanOrEqual 
-                        or OperatorType.LessThanOrEqual or OperatorType.LessThan or OperatorType.Equals or OperatorType.NotEqual)
-                    { return line.AsSpan(start, pointerCopy - start); }
-                    ++pointerCopy;
-                    break;
-                }
-                case TokenType.String:
-                {
-                    var value = token.ToString();
-                    if (value is "RND")
+                    if (char.TryParse(word.Value, out var address) && address is >= 'A' and <= 'Z')
                     {
-                        var funcSpan = FunctionParser.SelectFunctionTokens(line, pointerCopy);
-                        pointerCopy += funcSpan.Length;
+                        ++pointerCopy;
+                        continue;
                     }
-                    else if (char.TryParse(value, out _))
-                    { ++pointerCopy; }
-                    else
-                    { return line.AsSpan(start, pointerCopy - start);  }
-
+                    if (!FunctionParser.IsValidFunctionName(word.Value))
+                    { return line.Slice(start, pointerCopy - start); }
+                    
+                    var funcSpan = FunctionParser.SelectFunctionTokens(line, pointerCopy);
+                    pointerCopy += funcSpan.Length;
+                    break;
+                }
+                case NumberToken 
+                    or ServiceToken { Type: ServiceType.ParenthesisOpen or ServiceType.ParenthesisClose } 
+                    or OperatorToken { Type: OperatorType.Plus or OperatorType.Minus or OperatorType.Division or OperatorType.Multiplication }:
+                {
+                    ++pointerCopy;
                     break;
                 }
                 default:
-                { return line.AsSpan(start, pointerCopy - start); }
+                { return line.Slice(start, pointerCopy - start); }
             }
         }
+        return line.Slice(start, pointerCopy - start);
     }
     
-    public static ExpressionToken ParseExpression(Span<TinyBasicToken> selectedTokens)
+    public static ExpressionToken ParseExpression(Span<IToken> selectedTokens)
     {
         if (selectedTokens.Length is 0)
-        { throw new EmptyExpressionException("Tried to parse an empty expression"); }
+        { throw new ArgumentException("Tried to parse an empty expression"); }
         
-        List<TinyBasicToken> expression = [];
+        var expression = new List<IToken>(selectedTokens.Length);
         int pointer = 0;
         try
         { ParseExpression(selectedTokens, ref pointer, expression); }
         catch (ParsingException ex)
-        { throw new ParsingException($"Error parsing expression:\n >{ex.Message}"); }
+        { throw new ParsingException("Error parsing expression", ex); }
         
-        if (pointer + 1 < selectedTokens.Length)
-        { throw new UnexpectedOrEmptyTokenException($"Unexpected token {selectedTokens[pointer + 1]} at the end of expression {ExpressionToString(expression)}"); }
+        if (pointer < selectedTokens.Length)
+        { throw new UnexpectedTokenException($"Unexpected token {selectedTokens[pointer]} at the end of expression {ExpressionToString(expression)}"); }
         
         return new ExpressionToken(expression.ToArray());
     }
 
-    private static void ParseExpression(Span<TinyBasicToken> selectedTokens, ref int pointer, List<TinyBasicToken> finalExpression)
+    private static void ParseExpression(Span<IToken> selectedTokens, ref int pointer, List<IToken> finalExpression)
     {
         ParseTerm(selectedTokens, ref pointer, finalExpression);
         
-        while (pointer + 1 < selectedTokens.Length)
+        while (pointer < selectedTokens.Length 
+               && selectedTokens[pointer] is OperatorToken { Type: OperatorType.Plus or OperatorType.Minus } op)
         {
-            var op = selectedTokens[pointer + 1] as OperatorToken;
-            if (op?.OperatorType is not (OperatorType.Plus or OperatorType.Minus))
-            { return; }
             finalExpression.Add(op);
-            
             ++pointer;
-            if (pointer + 1 >= selectedTokens.Length)
-            { throw new UnexpectedOrEmptyTokenException($"Expected a factor after operator: {ExpressionToString(finalExpression)}"); }
+            if (pointer >= selectedTokens.Length)
+            { throw new UnexpectedTokenException($"Expected a factor after operator: {ExpressionToString(finalExpression)}"); }
             
-            ++pointer;
             ParseTerm(selectedTokens, ref pointer, finalExpression);
         }
     }
 
-    private static void ParseTerm(Span<TinyBasicToken> selectedTokens, ref int pointer, List<TinyBasicToken> finalExpression)
+    private static void ParseTerm(Span<IToken> selectedTokens, ref int pointer, List<IToken> finalExpression)
     {
         ParseFactor(selectedTokens, ref pointer, finalExpression);
         
-        while (pointer + 1 < selectedTokens.Length)
+        while (pointer < selectedTokens.Length 
+               && selectedTokens[pointer] is OperatorToken { Type: OperatorType.Division or OperatorType.Multiplication } op)
         {
-            var op = selectedTokens[pointer + 1] as OperatorToken;
-            if (op?.OperatorType is not (OperatorType.Division or OperatorType.Multiplication))
-            { return; }
             finalExpression.Add(op);
-            
             ++pointer;
-            if (pointer + 1 >= selectedTokens.Length)
-            { throw new UnexpectedOrEmptyTokenException($"Expected a factor after operator: {ExpressionToString(finalExpression)}"); }
+            if (pointer >= selectedTokens.Length)
+            { throw new UnexpectedTokenException($"Expected a factor after operator: {ExpressionToString(finalExpression)}"); }
             
-            ++pointer;
             ParseFactor(selectedTokens, ref pointer, finalExpression);
         }
     }
     
-    private static void ParseFactor(Span<TinyBasicToken> selectedTokens, ref int pointer, List<TinyBasicToken> finalExpression)
+    private static void ParseFactor(Span<IToken> selectedTokens, ref int pointer, List<IToken> finalExpression)
     {
         var token = selectedTokens[pointer];
-        while (token is OperatorToken op && op.OperatorType is (OperatorType.Plus or OperatorType.Minus))
+        while (token is OperatorToken { Type: OperatorType.Plus or OperatorType.Minus })
         {
             finalExpression.Add(token);
             ++pointer;
             if (pointer >= selectedTokens.Length)
-            { throw new UnexpectedOrEmptyTokenException($"Unmatched unary operator: {ExpressionToString(finalExpression)}"); }
+            { throw new UnexpectedTokenException($"Unmatched unary operator: {ExpressionToString(finalExpression)}"); }
 
             token = selectedTokens[pointer];
         }
 
-        switch (token.Type)
+        switch (token)
         {
-            case TokenType.Number:
+            case NumberToken:
             {
                 finalExpression.Add(token);
+                ++pointer;
                 return;
             }
-            case TokenType.ParenthesisOpen:
+            case ServiceToken { Type: ServiceType.ParenthesisOpen }:
             {
                 finalExpression.Add(token);
                 ++pointer;
                 ParseExpression(selectedTokens, ref pointer, finalExpression);
-                ++pointer;
-                if (pointer >= selectedTokens.Length || selectedTokens[pointer].Type != TokenType.ParenthesisClose)
-                { throw new UnexpectedOrEmptyTokenException($"Expected a closing parenthesis: {ExpressionToString(finalExpression)}"); }
+                if (pointer >= selectedTokens.Length || selectedTokens[pointer] is not ServiceToken { Type: ServiceType.ParenthesisClose })
+                { throw new UnexpectedTokenException($"Expected a closing parenthesis: {ExpressionToString(finalExpression)}"); }
+                
                 finalExpression.Add(selectedTokens[pointer]);
-
+                ++pointer;
                 return;
             }
-            case TokenType.String:
+            case WordToken word:
             {
-                var value = token.ToString();
-                if (char.TryParse(value, out char address) && address is >= 'A' and <= 'Z')
+                if (char.TryParse(word.Value, out char address) && address is >= 'A' and <= 'Z')
                 {
                     finalExpression.Add(token);
+                    ++pointer;
                     return;
                 }
-
-                if (value is not "RND")
+                if (!FunctionParser.IsValidFunctionName(word.Value))
                 { goto default; }
                 
                 var functionSpan = FunctionParser.SelectFunctionTokens(selectedTokens.ToArray(), pointer);
-                try
-                {
-                    var functionToken = FunctionParser.ParseFunction(functionSpan);
-                    finalExpression.Add(functionToken);
-                }
-                catch (ParsingException ex)
-                { throw new ParsingException($"Error while parsing function in expression:\n >{ex.Message}"); }
-
-                pointer += functionSpan.Length - 1;
+                var functionToken = FunctionParser.ParseFunction(functionSpan);
+                finalExpression.Add(functionToken);
+                pointer += functionSpan.Length;
                 return;
             }
             default:
-            { throw new UnexpectedOrEmptyTokenException($"Got unexpected token: {token}"); }
+            { throw new UnexpectedTokenException($"Got unexpected token: {token}"); }
         }
     }
 
-    private static string ExpressionToString(IEnumerable<TinyBasicToken> expression)
+    private static string ExpressionToString(IEnumerable<IToken> expression)
     {
         var sb = new StringBuilder();
         foreach (var token in expression)

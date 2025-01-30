@@ -31,10 +31,10 @@ public class ConsoleApplication
     private void ExecuteFile(string[] args)
     {
         var env = CreateFileEnvironment(args);
-        env.ExecuteLoadedFile();
+        env?.ExecuteLoadedFile();
     }
 
-    private FileEnvironment CreateFileEnvironment(string[] args)
+    private FileEnvironment? CreateFileEnvironment(string[] args)
     {
         if (args.Length < 1)
         { throw new ArgumentException("No path to file were provided"); }
@@ -42,10 +42,12 @@ public class ConsoleApplication
         var stringPath = args[0];
         if (stringPath[0] is '"' && stringPath[^1] is '"')
         { stringPath = stringPath[1..^2]; }
-        var file = File.ReadAllText(stringPath);
         
+        var file = File.ReadAllText(stringPath);
         var fileEnvironment = new FileEnvironment();
-        fileEnvironment.LoadFile(file);
+        if (!fileEnvironment.LoadFile(file))
+        { return null; }
+        
         Console.CancelKeyPress += fileEnvironment.CancelHandler;
         return fileEnvironment;
     }

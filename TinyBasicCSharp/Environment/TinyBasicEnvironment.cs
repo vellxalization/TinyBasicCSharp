@@ -45,13 +45,16 @@ public class TinyBasicEnvironment
     public void ExecuteDirectly(string line)
     {
         var tokens = TokenizeInput(line);
-        if (tokens.Length == 0 || tokens[0].Type is TokenType.NewLine)
+        if (tokens.Length == 0 || tokens[0] is ServiceToken { Type: ServiceType.Newline })
         { return; }
-        
-        LineParser parser = new(tokens);
-        if (!parser.ParseLine(out var statement, out string? error))
+
+        Statement? statement;
+        try
+        { statement = Parser.ParseStatement(tokens); }
+        catch (ParsingException ex)
         {
-            Console.WriteLine($"Syntax error:\n >{error}");
+            Console.WriteLine("Syntax error:");
+            ex.PrintException();
             return;
         }
         ExecuteDirectly(statement);
@@ -75,18 +78,20 @@ public class TinyBasicEnvironment
             try
             { ExecuteStatement(statement); }
             catch (RuntimeException ex)
-            { Console.WriteLine($"Runtime error: {ex.Message}"); }
+            {
+                Console.WriteLine("Runtime error:");
+                ex.PrintException();
+            }
         }
     }
     
-    protected TinyBasicToken[] TokenizeInput(string input)
+    protected IToken[] TokenizeInput(string input)
     {
-        var lexer = new Lexer(input);
         try
-        { return lexer.Tokenize(); }
+        { return Lexer.Tokenize(input); }
         catch (TokenizationException ex)
         {
-            Console.WriteLine($"Syntax error:\n >{ex.Message}");
+            ex.PrintException();
             return [];
         }
     }
@@ -97,7 +102,7 @@ public class TinyBasicEnvironment
         if (label == null)
         { throw new ArgumentException("Can't add statement without a label"); }
 
-        if (statement.StatementType is StatementType.Newline)
+        if (statement.Type is StatementType.Newline)
         { Program.Remove(label.Value); }
         else
         {
@@ -109,7 +114,7 @@ public class TinyBasicEnvironment
     protected void ExecuteStatement(Statement statement)
     {
         var arguments = statement.Arguments;
-        switch (statement.StatementType)
+        switch (statement.Type)
         {
             case StatementType.Let:
             {
@@ -182,15 +187,15 @@ public class TinyBasicEnvironment
         CurrentLineIndex = lineNumber;
     }
     
-    private void ExecuteLet(TinyBasicToken[] arguments)
+    private void ExecuteLet(IToken[] arguments)
     {
-        char address = char.Parse(arguments[0].ToString());
+        char address = char.Parse(arguments[0].ToString()!);
         var expression = (ExpressionToken)arguments[^1];
         short value = _evaluator.EvaluateExpression(expression);
         Memory.WriteVariable(value, address);
     }
 
-    private void ExecuteIf(TinyBasicToken[] arguments)
+    private void ExecuteIf(IToken[] arguments)
     {
         var expression = (ExpressionToken)arguments[0];
         var value1 = _evaluator.EvaluateExpression(expression);
@@ -207,7 +212,7 @@ public class TinyBasicEnvironment
     
     private bool CheckCondition(short value1, short value2, OperatorToken op)
     {
-        return op.OperatorType switch
+        return op.Type switch
         {
             OperatorType.GreaterThan => value1 > value2,
             OperatorType.GreaterThanOrEqual => value1 >= value2,
@@ -239,7 +244,8 @@ public class TinyBasicEnvironment
             catch (RuntimeException ex)
             {
                 var lineNumber = Program.GetKeyAtIndex(CurrentLineIndex);
-                Console.WriteLine($"Line {lineNumber}: Runtime error:\n >{ex.Message}");
+                Console.WriteLine($"Line {lineNumber}: Runtime error:");
+                ex.PrintException();
                 return;
             }
             ++CurrentLineIndex;
@@ -256,10 +262,10 @@ public class TinyBasicEnvironment
         { Console.WriteLine(statement); }
     }
 
-    private void GoToLabel(TinyBasicToken[] arguments, bool isSubroutine)
+    private void GoToLabel(IToken[] arguments, bool isSubroutine)
     {
-        var labelToken = (ValueToken)arguments[0];
-        short label = short.Parse(labelToken.ToString());
+        var labelToken = (NumberToken)arguments[0];
+        var label = (short)labelToken.Value;
         if (!Program.TryGetValue(label, out var instruction) || !instruction.isLabeled)
         { throw new RuntimeException($"Label {label} does not exist"); }
 
@@ -269,18 +275,18 @@ public class TinyBasicEnvironment
         CurrentLineIndex = (short)(Program.IndexOfKey(label) - 1); // decrement to compensate increment in ExecuteProgram()
     }
     
-    private void ExecuteInput(TinyBasicToken[] arguments)
+    private void ExecuteInput(IToken[] arguments)
     {
         List<char> addresses = new();
-        foreach (TinyBasicToken token in arguments)
+        foreach (var token in arguments)
         {
-            switch (token.Type)
+            switch (token)
             {
-                case TokenType.Comma:
+                case ServiceToken { Type: ServiceType.Comma }:
                 { continue; }
-                case TokenType.String:
+                case WordToken word:
                 {
-                    char address = char.Parse(token.ToString());
+                    char address = char.Parse(word.Value);
                     addresses.Add(address);
                     continue;
                 }
@@ -312,7 +318,8 @@ public class TinyBasicEnvironment
                 { value = _evaluator.EvaluateExpression(expression); }
                 catch (RuntimeException ex)
                 {
-                    Console.WriteLine($"Input queue: Runtime error:\n >{ex.Message}");
+                    Console.WriteLine("Input queue: Runtime error:");
+                    ex.PrintException();
                     continue;
                 }
                 _inputQueue.Enqueue(value);
@@ -328,26 +335,27 @@ public class TinyBasicEnvironment
         { return []; }
 
         var tokens = TokenizeInput(input);
-        if (tokens.Length == 0) // shouldn't be possible but still check just in case
+        if (tokens.Length == 0) 
         { return []; }
 
         try
         { return ParseInput(tokens); }
         catch (ParsingException ex)
         {
-            Console.WriteLine($"Error parsing INPUT expression:\n >{ex.Message}");
+            Console.WriteLine("Syntax error:");
+            ex.PrintException();
             return [];
         }
     }
 
-    private ExpressionToken[] ParseInput(TinyBasicToken[] input)
+    private ExpressionToken[] ParseInput(IToken[] input)
     {
         var pointer = 0;
         var expressions = new List<ExpressionToken>();
         while (pointer < input.Length)
         {
             var token = input[pointer];
-            if (token.Type is TokenType.Comma)
+            if (token is ServiceToken { Type: ServiceType.Comma })
             {
                 ++pointer;
                 if (pointer >= input.Length)
@@ -367,24 +375,23 @@ public class TinyBasicEnvironment
         return expressions.ToArray();
     }
     
-    private string ExpressionListToString(TinyBasicToken[] exprList)
+    private string ExpressionListToString(IToken[] exprList)
     {
         var builder = new StringBuilder();
-        foreach (var token in exprList)
+        for (int i = 0; i < exprList.Length; i += 2)
         {
-            switch (token.Type)
+            var token = exprList[i];
+            switch (token)
             {
-                case TokenType.Comma:
-                { continue; }
-                case TokenType.QuotedString:
+                case QuotedStringToken qString:
                 {
-                    var unquotedString = token.ToString().Trim('"');
+                    var unquotedString = qString.Value.Trim('"');
                     builder.Append(unquotedString);
                     break;
                 }
-                case TokenType.Expression:
+                case ExpressionToken expression:
                 {
-                    builder.Append(_evaluator.EvaluateExpression((ExpressionToken)token));
+                    builder.Append(_evaluator.EvaluateExpression(expression));
                     break;
                 }
                 default:

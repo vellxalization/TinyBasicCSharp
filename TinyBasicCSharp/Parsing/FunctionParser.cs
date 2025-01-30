@@ -1,130 +1,99 @@
-using System.Diagnostics;
 using TinyCompilerForTinyBasic.Tokenization;
 
 namespace TinyCompilerForTinyBasic.Parsing;
 
 public class FunctionParser
 {
-    public static FunctionToken ParseFunction(Span<TinyBasicToken> selectedTokens)
+    private static readonly Dictionary<string, IFunctionParser> Map = new()
+    {
+        { "RND", new RandomParser() }
+    };
+
+    public static bool IsValidFunctionName(string name) => Map.ContainsKey(name);
+    
+    public static FunctionToken ParseFunction(Span<IToken> selectedTokens)
     {
         if (selectedTokens.Length < 3)
         { throw new ParsingException("Function should contain at least 3 tokens (signature and a pair of parentheses)"); }
         
-        if (selectedTokens[0].Type is not TokenType.String)
-        { throw new UnexpectedOrEmptyTokenException("Expected a string function name"); }
-        var signature = selectedTokens[0].ToString();
+        if (selectedTokens[0] is not WordToken signature || !Map.TryGetValue(signature.Value, out var parser))
+        { throw new UnexpectedTokenException($"Expected a valid function name, got: {selectedTokens[0]}"); }
+        if (selectedTokens[1] is not ServiceToken { Type: ServiceType.ParenthesisOpen })
+        { throw new UnexpectedTokenException($"Expected an open parenthesis after function name {signature}"); }
+        if (selectedTokens[^1] is not ServiceToken { Type: ServiceType.ParenthesisClose })
+        { throw new UnexpectedTokenException($"Expected a closing parenthesis after arguments for function {signature}"); }
         
-        if (selectedTokens[1].Type is not TokenType.ParenthesisOpen)
-        { throw new UnexpectedOrEmptyTokenException($"Expected an open parenthesis after function name {signature}"); }
-        if (selectedTokens[^1].Type is not TokenType.ParenthesisClose)
-        { throw new UnexpectedOrEmptyTokenException($"Expected a closing parenthesis after arguments for function {signature}"); }
-        
-        if (signature is not "RND")
-        { throw new ParsingException($"Unknown function name {signature}"); }
-        
-        TinyBasicToken[][] arguments = [];
+        IToken[][] arguments = [];
         if (selectedTokens.Length > 3)
         {
-            var argsSlice = selectedTokens.Slice(2, selectedTokens.Length - 3);
+            var argsSlice = selectedTokens[2..^1];
             try
             { arguments = SliceArguments(argsSlice); }
             catch (ParsingException ex)
-            { throw new ParsingException($"Error parsing arguments for {signature} function:\n >{ex.Message}"); }
+            { throw new ParsingException($"Error parsing {signature} function", ex); }
         }
-
-        FunctionToken token;
-        switch (signature)
-        {
-            case "RND":
-            {
-                try
-                { token = ParseArgsForRandom(arguments); }
-                catch (ParsingException ex)
-                { throw new ParsingException($"Error while parsing arguments for RND function:\n >{ex.Message}"); }
-
-                break;
-            }
-            default:
-            { throw new UnexpectedOrEmptyTokenException($"Unknown function name {signature}"); }
-        }
-
-        return token;
-    }
-
-    private static FunctionToken ParseArgsForRandom(TinyBasicToken[][] arguments)
-    {
-        if (arguments.Length != 1)
-        { throw new ParsingException($"Expected 1 argument for RND function, got {arguments.Length}"); }
 
         try
-        {
-            var expression = ExpressionParser.ParseExpression(arguments[0]);
-            return new FunctionToken([expression], "RND");
-        }
+        { return parser.Parse(signature.Value, arguments); }
         catch (ParsingException ex)
-        { throw new ParsingException($"Error parsing expression for RND argument:\n >{ex.Message}"); }
+        { throw new ParsingException($"Error parsing {signature} function", ex); }
     }
     
-    private static TinyBasicToken[][] SliceArguments(Span<TinyBasicToken> argsSlice)
+    private static IToken[][] SliceArguments(Span<IToken> argsSlice)
     {
-        List<TinyBasicToken[]> arguments = [];
-        int pointer = 0;
-        int i = 0;
-        for (; i < argsSlice.Length; ++i)
+        List<IToken[]> arguments = new(2);
+        int anchor = 0;
+        for (var i = 0; i < argsSlice.Length; ++i)
         {
-            var token = argsSlice[i];
-            if (token.Type is not TokenType.Comma)
+            if (argsSlice[i] is not ServiceToken { Type: ServiceType.Comma })
             { continue; }
 
-            if (i + 1 >= argsSlice.Length ||
-                argsSlice[i + 1].Type is TokenType.NewLine or TokenType.Comma or TokenType.ParenthesisClose)
-            { throw new UnexpectedOrEmptyTokenException("Expected next argument after comma"); }
+            ++i;
+            if (i >= argsSlice.Length 
+                || argsSlice[i] is ServiceToken { Type: ServiceType.Comma or ServiceType.Newline })
+            { throw new UnexpectedTokenException("Expected next argument after comma"); }
             
-            arguments.Add(argsSlice.Slice(pointer, i - pointer).ToArray());
-            pointer = i + 1;
+            arguments.Add(argsSlice[anchor..(i - 1)].ToArray());
+            anchor = i;
         }
         
-        arguments.Add(argsSlice.Slice(pointer, i - pointer).ToArray());
+        arguments.Add(argsSlice[anchor..].ToArray());
         return arguments.ToArray();
     }
     
-    public static Span<TinyBasicToken> SelectFunctionTokens(TinyBasicToken[] tokens, int startFrom)
+    public static Span<IToken> SelectFunctionTokens(Span<IToken> tokens, int startFrom)
     {
-        if (tokens[startFrom].Type is not TokenType.String)
+        if (tokens[startFrom] is not WordToken signature || !IsValidFunctionName(signature.Value))
         { return []; }
 
-        int pointerCopy = startFrom;
-        ++startFrom;
-        if (startFrom >= tokens.Length || tokens[startFrom].Type is not TokenType.ParenthesisOpen)
-        { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy); }
-        ++startFrom;
-
+        int pointerCopy = startFrom + 1;
+        if (pointerCopy >= tokens.Length || tokens[pointerCopy] is not ServiceToken { Type: ServiceType.ParenthesisOpen })
+        { return tokens.Slice(startFrom, 1); }
+        
+        ++pointerCopy;
         int parenthesisCount = 1;
-        while (true)
+        while (parenthesisCount > 0)
         {
-            if (startFrom >= tokens.Length)
-            { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy); }
-            
-            var token = tokens[startFrom];
-            switch (token.Type)
-            {
-                case TokenType.NewLine:
-                { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy + 1); }
-                case TokenType.ParenthesisOpen:
-                {
-                    ++parenthesisCount;
-                    break;
-                }
-                case TokenType.ParenthesisClose:
-                {
-                    --parenthesisCount;
-                    if (parenthesisCount == 0)
-                    { return tokens.AsSpan(pointerCopy, startFrom - pointerCopy + 1); }
+            if (pointerCopy >= tokens.Length)
+            { return tokens[startFrom..]; }
 
-                    break;
-                }
+            if (tokens[pointerCopy] is not ServiceToken service)
+            {
+                ++pointerCopy;
+                continue;
             }
-            ++startFrom;
+            
+            if (service.Type == ServiceType.Newline)
+            { break; }
+            
+            if (service.Type == ServiceType.ParenthesisOpen)
+            { ++parenthesisCount; }
+            else if (service.Type == ServiceType.ParenthesisClose)
+            { --parenthesisCount; }
+            
+            ++pointerCopy;
         }
+        
+        return tokens[startFrom..pointerCopy];
     }
 }

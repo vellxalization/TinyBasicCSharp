@@ -20,84 +20,73 @@ public class ExpressionEvaluator
     public short EvaluateExpression(ExpressionToken expression)
     {
         int start = 0;
-        short value = EvaluateExpression(expression.Components, ref start);
+        short value = EvaluateExpression(expression.Arguments, ref start);
 
         return value;
     }
 
-    private short EvaluateExpression(TinyBasicToken[] expression, ref int start)
+    private short EvaluateExpression(IToken[] expression, ref int start)
     {
         short value = EvaluateTerm(expression, ref start);
         
-        while ((start + 1) < expression.Length)
+        while ((start + 1) < expression.Length
+               && expression[start + 1] is OperatorToken { Type: OperatorType.Plus or OperatorType.Minus } op)
         {
-            var op = expression[start + 1] as OperatorToken;
-            if (op?.OperatorType is not (OperatorType.Plus or OperatorType.Minus))
-            { break; }
-
             start += 2;
             short secondValue = EvaluateTerm(expression, ref start);
-            value = op.OperatorType is OperatorType.Plus ? unchecked((short)(value + secondValue)) : unchecked((short)(value - secondValue));
+            value = op.Type is OperatorType.Plus ? unchecked((short)(value + secondValue)) : unchecked((short)(value - secondValue));
         }
         return value;
     }
     
-    private short EvaluateTerm(TinyBasicToken[] expression, ref int start)
+    private short EvaluateTerm(IToken[] expression, ref int start)
     {
         short value = EvaluateFactor(expression, ref start);
 
-        while ((start + 1) < expression.Length)
+        while ((start + 1) < expression.Length 
+               && expression[start + 1] is OperatorToken { Type: OperatorType.Division or OperatorType.Multiplication } op)
         {
-            var op = expression[start + 1] as OperatorToken;
-            if (op?.OperatorType is not (OperatorType.Division or OperatorType.Multiplication))
-            { break; }
-            
             start += 2;
             short secondValue = EvaluateFactor(expression, ref start);
-            
-            if (op?.OperatorType is OperatorType.Multiplication)
+            if (op.Type is OperatorType.Multiplication)
             { value = unchecked((short)(value * secondValue)); } 
             else
             {
                 if (secondValue is 0)
-                { throw new DivisionByZeroException("Tried to divide by zero"); }
+                { throw new DivisionByZeroException(value); }
                 value = unchecked((short)(value / secondValue));
             }
         }
         return value;
     }
     
-    private short EvaluateFactor(TinyBasicToken[] expression, ref int start)
+    private short EvaluateFactor(IToken[] expression, ref int start)
     {
         bool shouldNegate = false;
-        TinyBasicToken token = expression[start];
-        while (token is OperatorToken op && op.OperatorType is (OperatorType.Plus or OperatorType.Minus))
+        var token = expression[start];
+        while (token is OperatorToken { Type: (OperatorType.Plus or OperatorType.Minus) } op)
         {
-            if (op.OperatorType is OperatorType.Minus)
+            if (op.Type is OperatorType.Minus)
             { shouldNegate = !shouldNegate; }
 
             ++start;
             token = expression[start];
         }
-        switch (token.Type)
+        switch (token)
         {
-            case TokenType.Number:
+            case NumberToken num:
+            { return shouldNegate ? unchecked((short)-num.Value) : unchecked((short)num.Value); }
+            case WordToken word:
             {
-                int value = int.Parse(token.ToString());
-                return shouldNegate ? unchecked((short)-value) : unchecked((short)value);
-            }
-            case TokenType.String:
-            {
-                char address = char.Parse(token.ToString());
+                char address = char.Parse(word.Value);
                 short? value = _memory.ReadVariable(address);
                 if (value is null)
-                { throw new UnitializedVariableException($"Tried to read an uninitialized variable \"{address}\""); }
+                { throw new UninitializedVariableException(address); }
 
                 return (short)(shouldNegate ? -value.Value : value.Value);
             }
-            case TokenType.Function:
+            case FunctionToken funcToken:
             {
-                var funcToken = (FunctionToken)token;
                 switch (funcToken.Signature)
                 {
                     case "RND":
@@ -109,7 +98,7 @@ public class ExpressionEvaluator
                     { throw new RuntimeException($"Unknown function signature: {funcToken.Signature}"); }
                 }
             }
-            case TokenType.ParenthesisOpen:
+            case ServiceToken { Type: ServiceType.ParenthesisOpen }:
             {
                 ++start;
                 short value = EvaluateExpression(expression, ref start);
@@ -126,7 +115,7 @@ public class ExpressionEvaluator
         var expressionArgument = (ExpressionToken)token.Arguments[0];
         short argumentValue = EvaluateExpression(expressionArgument);
         if (argumentValue <= 0)
-        { throw new RuntimeException("Argument for RND function should be more than 0"); }
+        { throw new RuntimeException($"Argument for RND function should be more than 0, got: {argumentValue}"); }
         
         return (short)Random.Shared.Next(0, argumentValue);
     }

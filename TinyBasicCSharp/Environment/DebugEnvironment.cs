@@ -75,7 +75,7 @@ public class DebugEnvironment : TinyBasicEnvironment
                               Console.WriteLine("Expected a valid line number as an argument");
                               return;
                          }
-                         if (statement.statement.StatementType == StatementType.Rem)
+                         if (statement.statement.Type == StatementType.Rem)
                          {
                               Console.WriteLine("Can't run to a comment line");
                               return;
@@ -85,9 +85,14 @@ public class DebugEnvironment : TinyBasicEnvironment
                     }
                     default:
                     {
-                         if (!ValidateLineNumberArgument(args[0], out var line, out _))
+                         if (!ValidateLineNumberArgument(args[0], out var line, out var statement))
                          {
                               Console.WriteLine("Expected a valid line number as a valid first argument");
+                              return;
+                         }
+                         if (statement.statement.Type == StatementType.Rem)
+                         {
+                              Console.WriteLine("Can't run to a comment line");
                               return;
                          }
                          if (args[1] is not ("-f" or "--force"))
@@ -119,7 +124,7 @@ public class DebugEnvironment : TinyBasicEnvironment
                     Console.WriteLine("Expected a valid line number or \"-a\" / \"--all\" as an argument");
                     return;
                }
-               if (statement.statement.StatementType == StatementType.Rem)
+               if (statement.statement.Type == StatementType.Rem)
                {
                     Console.WriteLine("Can't place a breakpoint on a comment line");
                     return;
@@ -172,7 +177,7 @@ public class DebugEnvironment : TinyBasicEnvironment
           CurrentLineIndex = 0;
           IsRunning = true;
           
-          if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
+          if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.Type == StatementType.Rem)
           { SkipComments(); }
           if (!CanRun())
           {
@@ -187,7 +192,7 @@ public class DebugEnvironment : TinyBasicEnvironment
           try
           { await InterruptExecution(); }
           catch (RuntimeException ex)
-          { Console.WriteLine($"Runtime error:\n >{ex.Message}"); }
+          { ex.PrintException(); }
           finally
           { await _emitter.Close(); }
      }
@@ -210,19 +215,19 @@ public class DebugEnvironment : TinyBasicEnvironment
      private new async Task ExecuteDirectly(string line)
      {
           var tokens = TokenizeInput(line);
-          if (tokens.Length == 0 || tokens[0].Type is TokenType.NewLine)
+          if (tokens.Length == 0 || tokens[0] is ServiceToken { Type: ServiceType.Newline })
           { return; }
-          
-          var parser = new LineParser(tokens);
-          if (!parser.ParseLine(out var statement, out string? error))
+
+          try
           {
-               Console.WriteLine($"Syntax error:\n >{error}");
-               return;
+               var parsedLine = Parser.ParseStatement(tokens);
+               if (parsedLine.Label is null)
+               { base.ExecuteDirectly(parsedLine); }
+               else
+               { await UpdateProgram(parsedLine); }
           }
-          if (statement.Label is null)
-          { base.ExecuteDirectly(statement); }
-          else
-          { await UpdateProgram(statement); }
+          catch (ParsingException ex)
+          { ex.PrintException(); }
      }
      
      private new async Task UpdateProgram(Statement statement)
@@ -230,7 +235,7 @@ public class DebugEnvironment : TinyBasicEnvironment
           if (statement.Label is null)
           { throw new ArgumentException("Provided statement should be labeled"); }
           
-          if (statement.StatementType == StatementType.Newline)
+          if (statement.Type == StatementType.Newline)
           { await RemoveLine(statement.Label.Value); }
           else
           { await AddOrUpdateLine(statement); }
@@ -255,7 +260,7 @@ public class DebugEnvironment : TinyBasicEnvironment
           {
                Program.SetValueAtIndex(indexOfNew, (statement, true));
                await _emitter.UpdateLine(statement, indexOfNew);
-               if (CurrentLineIndex == indexOfNew && statement.StatementType == StatementType.Rem)
+               if (CurrentLineIndex == indexOfNew && statement.Type == StatementType.Rem)
                {
                     SkipComments();
                     await _emitter.UpdateCurrentLine(CurrentLineIndex);
@@ -278,7 +283,7 @@ public class DebugEnvironment : TinyBasicEnvironment
                await _emitter.Print();
                return;
           }
-          if (CurrentLineIndex == removedIndex && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
+          if (CurrentLineIndex == removedIndex && Program.GetValueAtIndex(CurrentLineIndex).statement.Type == StatementType.Rem)
           {
                SkipComments();
                await _emitter.UpdateCurrentLine(CurrentLineIndex);
@@ -298,14 +303,17 @@ public class DebugEnvironment : TinyBasicEnvironment
                var commandRequest = await _cli.RequestAndExecuteAsync();
                if (commandRequest.executed)
                { continue; }
+               
                if (commandRequest.command == null)
                { continue; }
+               
                await ExecuteDirectly(string.Join(' ', commandRequest.command.Signature, 
                     string.Join(' ', commandRequest.command.Arguments)));
           }
 
           if (!IsRunning) 
           { return; }
+          
           Console.WriteLine("Runtime error: Run out of lines. Possibly missed the END or RETURN keyword?");
           TerminateExecution();
      }
@@ -319,21 +327,21 @@ public class DebugEnvironment : TinyBasicEnvironment
                {
                     ExecuteStatement(currentLine.statement);
                     ++CurrentLineIndex;
-                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
+                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.Type == StatementType.Rem)
                     { SkipComments(); }
                     break;
                }
                case StepMode.Over:
                {
-                    if (currentLine.statement.StatementType != StatementType.Gosub)
+                    if (currentLine.statement.Type != StatementType.Gosub)
                     { goto case StepMode.In; }
                     
                     ExecuteStatement(currentLine.statement);
                     ++CurrentLineIndex;
-                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
+                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.Type == StatementType.Rem)
                     { SkipComments(); }
                     RunFrame(ignoreBreakpoints);
-                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
+                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.Type == StatementType.Rem)
                     { SkipComments(); }
                     break;
                }
@@ -343,7 +351,7 @@ public class DebugEnvironment : TinyBasicEnvironment
                     { break; }
                     
                     RunFrame(ignoreBreakpoints);
-                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem)
+                    if (CanRun() && Program.GetValueAtIndex(CurrentLineIndex).statement.Type == StatementType.Rem)
                     { SkipComments(); }
                     break;
                }
@@ -415,7 +423,7 @@ public class DebugEnvironment : TinyBasicEnvironment
      {
           do
           { ++CurrentLineIndex; } 
-          while(CurrentLineIndex < Program.Count && Program.GetValueAtIndex(CurrentLineIndex).statement.StatementType == StatementType.Rem);
+          while(CurrentLineIndex < Program.Count && Program.GetValueAtIndex(CurrentLineIndex).statement.Type == StatementType.Rem);
      }
      
      private enum StepMode
