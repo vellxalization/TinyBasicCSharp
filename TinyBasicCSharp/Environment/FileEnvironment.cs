@@ -48,14 +48,16 @@ public class FileEnvironment : TinyBasicEnvironment
         if (label != null)
         {
             base.UpdateProgram(statement);
-            CurrentLineIndex = (short)(label.Value + 1);
+            var newValue = (short)(label.Value + 1);
+            if (newValue >= CurrentLineIndex)
+            { CurrentLineIndex = newValue; }
             return;
         }
 
         if (statement.Type == StatementType.Newline)
         { throw new ArgumentException("Statement must have a label or shouldn't be a new line"); }
         
-        ++CurrentLineIndex;
         Program[CurrentLineIndex] = (statement, false);
+        ++CurrentLineIndex;
     }
 }
