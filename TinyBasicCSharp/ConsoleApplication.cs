@@ -85,7 +85,12 @@ public class ConsoleApplication
     private Task Debug(string[] args)
     {
         var debugEnvironment = args.Length > 0 ? CreateFileEnvironment(args[0])?.CreateDebugEnvironment() : _environment.CreateDebugEnvironment();
-        return debugEnvironment != null ? debugEnvironment.Debug() : Task.CompletedTask;
+        if (debugEnvironment == null)
+        { return Task.CompletedTask; }
+        
+        
+        Console.CancelKeyPress += debugEnvironment.CancelHandler;
+        return debugEnvironment.Debug();
     }
     
     /// <summary>
