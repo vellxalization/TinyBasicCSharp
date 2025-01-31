@@ -363,14 +363,18 @@ public class DebugEnvironment : TinyBasicEnvironment
      private void RunFrame(bool ignoreBreakpoints)
      {
           var currentFrame = ReturnStack.Count;
-          while (CanRun() && currentFrame <= ReturnStack.Count)
+          if (currentFrame == 0)
+          { throw new Exception("Tried to run frame while not in a function"); }
+
+          do
           {
-               if (!ignoreBreakpoints && _breakPoints.Contains(Program.GetKeyAtIndex(CurrentLineIndex)))
-               { return; }
                var line = Program.GetValueAtIndex(CurrentLineIndex);
                ExecuteStatement(line.statement);
                ++CurrentLineIndex;
+               if (!ignoreBreakpoints && _breakPoints.Contains(Program.GetKeyAtIndex(CurrentLineIndex)))
+               { return; }
           }
+          while (CanRun() && currentFrame <= ReturnStack.Count);
      }
 
      private async Task RunTo(short lineNumber, bool ignoreBreakpoints)
