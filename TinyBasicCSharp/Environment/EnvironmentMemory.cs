@@ -1,4 +1,4 @@
-﻿namespace TinyCompilerForTinyBasic.Environment;
+﻿namespace TinyBasicCSharp.Environment;
 
 /// <summary>
 /// Class for convenient storing of values 

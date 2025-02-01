@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace TinyCompilerForTinyBasic.Tokenization;
+namespace TinyBasicCSharp.Tokenization;
 
 // yes, this is a marker interface. Too bad
 public interface IToken

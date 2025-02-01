@@ -1,7 +1,4 @@
-﻿using TinyCompilerForTinyBasic;
-using TinyCompilerForTinyBasic.Environment;
-using TinyCompilerForTinyBasic.Parsing;
-using TinyCompilerForTinyBasic.Tokenization;
+﻿using TinyBasicCSharp;
 
 var app = new ConsoleApplication();
 await app.Run();

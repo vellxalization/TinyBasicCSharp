@@ -1,6 +1,6 @@
-﻿using TinyCompilerForTinyBasic.Tokenization;
+﻿using TinyBasicCSharp.Tokenization;
 
-namespace TinyCompilerForTinyBasic.Environment;
+namespace TinyBasicCSharp.Environment;
 
 /// <summary>
 /// Class for evaluating expressions

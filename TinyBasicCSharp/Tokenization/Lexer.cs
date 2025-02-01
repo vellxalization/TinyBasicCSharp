@@ -1,4 +1,4 @@
-namespace TinyCompilerForTinyBasic.Tokenization;
+namespace TinyBasicCSharp.Tokenization;
 
 public static class Lexer
 {

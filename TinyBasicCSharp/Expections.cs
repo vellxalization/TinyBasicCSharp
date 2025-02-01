@@ -1,4 +1,4 @@
-﻿namespace TinyCompilerForTinyBasic;
+﻿namespace TinyBasicCSharp;
 
 public class TinyBasicException(string message, Exception? innerException = null) : Exception(message, innerException)
 {

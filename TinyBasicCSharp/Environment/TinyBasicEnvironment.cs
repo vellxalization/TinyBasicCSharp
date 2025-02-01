@@ -1,8 +1,8 @@
 ﻿using System.Text;
-using TinyCompilerForTinyBasic.Parsing;
-using TinyCompilerForTinyBasic.Tokenization;
+using TinyBasicCSharp.Parsing;
+using TinyBasicCSharp.Tokenization;
 
-namespace TinyCompilerForTinyBasic.Environment;
+namespace TinyBasicCSharp.Environment;
 
 public class TinyBasicEnvironment
 {

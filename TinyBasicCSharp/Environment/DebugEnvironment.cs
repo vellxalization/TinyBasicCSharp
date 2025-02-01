@@ -1,9 +1,9 @@
-using TinyCompilerForTinyBasic.Parsing;
-using TinyCompilerForTinyBasic.Tokenization;
+using TinyBasicCSharp.Parsing;
+using TinyBasicCSharp.Tokenization;
 
-namespace TinyCompilerForTinyBasic.Environment;
+namespace TinyBasicCSharp.Environment;
 
-public class DebugEnvironment : TinyBasicEnvironment
+public partial class DebugEnvironment : TinyBasicEnvironment
 {
      private readonly HashSet<short> _breakPoints = [];
      private readonly ConsoleInterface _cli;

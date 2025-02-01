@@ -1,6 +1,6 @@
-using TinyCompilerForTinyBasic.Tokenization;
+using TinyBasicCSharp.Tokenization;
 
-namespace TinyCompilerForTinyBasic.Parsing;
+namespace TinyBasicCSharp.Parsing;
 
 public class FunctionParser
 {

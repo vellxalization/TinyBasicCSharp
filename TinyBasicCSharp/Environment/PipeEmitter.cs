@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.IO.Pipes;
-using TinyCompilerForTinyBasic.Tokenization;
+using TinyBasicCSharp.Tokenization;
 
-namespace TinyCompilerForTinyBasic.Environment;
+namespace TinyBasicCSharp.Environment;
 
 public class PipeEmitter
 {

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace TinyCompilerForTinyBasic;
+namespace TinyBasicCSharp;
 
 public class ConsoleInterface
 {
