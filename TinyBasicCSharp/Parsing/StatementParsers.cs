@@ -91,7 +91,11 @@ public class RemParser : IStatementParser
         if (line[0] is not WordToken { Value: "REM" })
         { throw new ArgumentException("Tried to parse REM statement without a REM keyword"); }
         
-        return new Statement(StatementType.Rem, line[1..^1].ToArray(), null);
+        return line.Length == 1 
+            ? new Statement(StatementType.Rem, [], null) 
+            : new Statement(StatementType.Rem, (line[^1] is ServiceToken { Type: ServiceType.Newline }
+                    ? line[1..^1].ToArray()
+                    : line[1..].ToArray()), null);
     }
 }
 

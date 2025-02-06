@@ -34,4 +34,6 @@ public class EnvironmentMemory
         
         return _memory[address - 'A'];
     }
+
+    public void Reset() => _memory = new short?[26];
 }

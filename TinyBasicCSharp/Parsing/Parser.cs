@@ -4,7 +4,7 @@ namespace TinyBasicCSharp.Parsing;
 
 public static class Parser
 {
-    private static Dictionary<string, IStatementParser>? _map = null;
+    private static Lazy<Dictionary<string, IStatementParser>> _map = new(CreateMap);
     
     public static Statement ParseStatement(Span<IToken> singleLine)
     {
@@ -16,10 +16,7 @@ public static class Parser
         if (label != null && (singleLine.Length == 1 || singleLine[1] is ServiceToken { Type:ServiceType.Newline }))
         { return new Statement(StatementType.Newline, [], label); }
         
-        if (_map == null)
-        { InitMap(); }
-        
-        if (!_map!.TryGetValue(singleLine[statementIndex].ToString()!, out var parser))
+        if (!_map.Value.TryGetValue(singleLine[statementIndex].ToString()!, out var parser))
         { throw new UnexpectedTokenException($"Unrecognized keyword: {singleLine[statementIndex]}"); }
         
         try
@@ -42,11 +39,11 @@ public static class Parser
         return (short)numberToken.Value;
     }
 
-    private static void InitMap()
+    private static Dictionary<string, IStatementParser> CreateMap()
     {
         var jump = new JumpParser();
         var single = new SingleWordParser();
-        _map = new Dictionary<string, IStatementParser>()
+        var map = new Dictionary<string, IStatementParser>()
         {
             { "LET", new LetParser() },
             { "IF", new IfParser() },
@@ -61,6 +58,7 @@ public static class Parser
             { "RUN", single },
             { "REM", new RemParser() }
         };
+        return map;
     }
     
     public static IToken[][] SplitByNewline(IToken[] tokens)
@@ -80,4 +78,6 @@ public static class Parser
         lines.Add(tokens[anchor..]);
         return lines.ToArray();
     }
+    
+    public static string[] GetAllStatements() => _map.Value.Keys.ToArray();
 }

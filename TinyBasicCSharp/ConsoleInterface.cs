@@ -24,6 +24,19 @@ public class ConsoleInterface
     }
     
     /// <summary>
+    /// Service method for requesting a confirmation from a user
+    /// </summary>
+    /// <returns>true if confirmed, false otherwise</returns>
+    public static bool RequestConfirmation()
+    {
+        var input = Console.ReadLine()?.ToLower() ?? "";
+        while(string.IsNullOrEmpty(input) || input is not ("y" or "yes" or "n" or "no"))
+        { input = Console.ReadLine(); }
+        
+        return input is "y" or "yes";
+    }
+    
+    /// <summary>
     /// Requests and tries to execute command asynchronously
     /// </summary>
     /// <returns>bool - has any command been executed;

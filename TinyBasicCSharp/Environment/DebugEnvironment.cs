@@ -22,156 +22,198 @@ public partial class DebugEnvironment : TinyBasicEnvironment
      
      private void AddCommands()
      {
-          _cli.RegisterCommand("step", async (command) =>
-          {
-               var args = command.Arguments;
-               switch (args.Length)
-               {
-                    case 0:
-                    {
-                         await SingleStep(StepMode.In, false);
-                         return;
-                    }
-                    case 1:
-                    {
-                         if (args[0] is "-f" or "--force")
-                         { await SingleStep(StepMode.In, true); }
-                         else if (Enum.TryParse<StepMode>(args[0], true, out var step))
-                         { await SingleStep(step, false); }
-                         else
-                         { Console.WriteLine("Unknown argument provided"); }
+          _cli.RegisterCommand("help", HandleHelp);
+          _cli.RegisterCommand("step", HandleStep);
+          _cli.RegisterCommand("run", async (command) => { await HandleRun(command); });
+          _cli.RegisterCommand("break", async (command) => { await HandleBreak(command); });
+          _cli.RegisterCommand("memory", HandleMemory);
+          _cli.RegisterCommand("update", async (_) => { await HandleUpdate(); });
+          _cli.RegisterCommand("exit", (_) => { HandleExit(); });
+          _cli.RegisterCommand("stack", (_) => HandleStack());
+     }
 
-                         return;
-                    }
-                    default:
-                    {
-                         if (!Enum.TryParse<StepMode>(args[0], true, out var step))
-                         { Console.WriteLine("Expected a step mode as a valid first argument"); }
-                         else if (args[1] is not ("-f" or "--force"))
-                         { Console.WriteLine("Expected a force mode as a valid second argument"); }
-                         else
-                         { await SingleStep(step, true); }
+     private void HandleHelp(ConsoleCommand command)
+     {
+          var args = command.Arguments;
+          if (args.Length == 0)
+          {
+               DebuggerManual.PrintHelp();
+               return;
+          }
 
-                         return;
-                    }
-               }
-          });
-          _cli.RegisterCommand("run", async (command) =>
+          switch (args[0])
           {
-               var args = command.Arguments;
-               switch (args.Length)
-               {
-                    case 0:
-                    {
-                         ExecuteStatement(Program.GetValueAtIndex(CurrentLineIndex).statement);
-                         ++CurrentLineIndex;
-                         await RunToBreakpoint();
-                         return;
-                    }
-                    case 1:
-                    {
-                         if (!ValidateLineNumberArgument(args[0], out var line, out var statement))
-                         {
-                              Console.WriteLine("Expected a valid line number as an argument");
-                              return;
-                         }
-                         if (statement.statement.Type == StatementType.Rem)
-                         {
-                              Console.WriteLine("Can't run to a comment line");
-                              return;
-                         }
-                         await RunTo(line, false);
-                         return;
-                    }
-                    default:
-                    {
-                         if (!ValidateLineNumberArgument(args[0], out var line, out var statement))
-                         {
-                              Console.WriteLine("Expected a valid line number as a valid first argument");
-                              return;
-                         }
-                         if (statement.statement.Type == StatementType.Rem)
-                         {
-                              Console.WriteLine("Can't run to a comment line");
-                              return;
-                         }
-                         if (args[1] is not ("-f" or "--force"))
-                         {
-                              Console.WriteLine("Expected a force mode as a valid second argument");
-                              return;
-                         }
-                         await RunTo(line, true);
-                         return;
-                    }
-               }
-          });
-          _cli.RegisterCommand("break", async (command) =>
-          {
-               var args = command.Arguments;
-               if (args.Length == 0)
-               {
-                    Console.WriteLine("Expected an argument");
-                    return;
-               }
-               if (args[0] is "-a" or "--all")
-               {
-                    foreach (var breakPoint in _breakPoints.Order())
-                    { Console.WriteLine($"Breakpoint at: {breakPoint}"); }
-                    return;
-               }
-               if (!ValidateLineNumberArgument(args[0], out var line, out var statement))
-               {
-                    Console.WriteLine("Expected a valid line number or \"-a\" / \"--all\" as an argument");
-                    return;
-               }
-               if (statement.statement.Type == StatementType.Rem)
-               {
-                    Console.WriteLine("Can't place a breakpoint on a comment line");
-                    return;
-               }
-               
-               await _emitter.EnsureConnected();
-               if (!_breakPoints.Add(line))
-               { _breakPoints.Remove(line); }
-               await _emitter.UpdateBreakpoint(line);
-          });
-          _cli.RegisterCommand("memory", (command) =>
-          {
-               var args = command.Arguments;
-               if (args.Length == 0)
-               { PrintMemory(null); }
-               else
-               {
-                    var address = args[0];
-                    if (!char.TryParse(address, out var charAddress) || charAddress is < 'A' or > 'Z')
-                    { Console.WriteLine("Invalid address as an argument"); }
-                    else
-                    { PrintMemory(charAddress); }
-               }
-          });
-          _cli.RegisterCommand("update", async (_) =>
-          {
-               await _emitter.EnsureConnected();
-               await _emitter.Print();
-          });
-          _cli.RegisterCommand("exit", (_) =>
-          {
-               TerminateExecution();
-               Console.WriteLine("Execution terminated");
-          });
-          _cli.RegisterCommand("stack", (_) => PrintCallStack());
-          
-          return;
-          bool ValidateLineNumberArgument(string arg, out short line, out (Statement statement, bool isLabeled) statement)
-          {
-               statement = default;
-               line = 0;
-               if (!short.TryParse(arg, out line) || line < 0)
-               { return false; }
-               return Program.TryGetValue(line, out statement);
+               case "run":
+                    DebuggerManual.PrintRun();
+                    break;
+               case "step":
+                    DebuggerManual.PrintStep();
+                    break;
+               case "break":
+                    DebuggerManual.PrintBreak();
+                    break;
+               case "stack":
+                    DebuggerManual.PrintStack();
+                    break;
+               case "exit":
+                    DebuggerManual.PrintExit();
+                    break;
+               case "update":
+                    DebuggerManual.PrintUpdate();
+                    break;
+               case "memory":
+                    DebuggerManual.PrintMemory();
+                    break;
+               default:
+                    Console.WriteLine("Unknown argument for help");
+                    break;
           }
      }
      
+     private async Task HandleRun(ConsoleCommand command)
+     {
+          var args = command.Arguments;
+          switch (args.Length)
+          {
+               case 0:
+               {
+                    ExecuteStatement(Program.GetValueAtIndex(CurrentLineIndex).statement);
+                    ++CurrentLineIndex;
+                    await RunToBreakpoint();
+                    return;
+               }
+               case 1:
+               {
+                    if (!short.TryParse(args[0], out var line) || !Program.TryGetValue(line, out var statement))
+                    {
+                         Console.WriteLine("Expected a valid line number as an argument");
+                         return;
+                    }
+                    if (statement.statement.Type == StatementType.Rem)
+                    {
+                         Console.WriteLine("Can't run to a comment line");
+                         return;
+                    }
+                    await RunTo(line, false);
+                    return;
+               }
+               default:
+               {
+                    if (!short.TryParse(args[0], out var line) || !Program.TryGetValue(line, out var statement))
+                    {
+                         Console.WriteLine("Expected a valid line number as a valid first argument");
+                         return;
+                    }
+                    if (statement.statement.Type == StatementType.Rem)
+                    {
+                         Console.WriteLine("Can't run to a comment line");
+                         return;
+                    }
+                    if (args[1] is not ("-f" or "--force"))
+                    {
+                         Console.WriteLine("Expected a force mode as a valid second argument");
+                         return;
+                    }
+                    await RunTo(line, true);
+                    return;
+               }
+          }
+     }
+
+     private async Task HandleBreak(ConsoleCommand command)
+     {
+          var args = command.Arguments;
+          if (args.Length == 0)
+          {
+               Console.WriteLine("Expected an argument");
+               return;
+          }
+          if (args[0] is "-a" or "--all")
+          {
+               foreach (var breakPoint in _breakPoints.Order())
+               { Console.WriteLine($"Breakpoint at: {breakPoint}"); }
+
+               return;
+          }
+          if (!short.TryParse(args[0], out var line) || !Program.TryGetValue(line, out var statement))
+          {
+               Console.WriteLine("Expected a valid line number or \"-a\" / \"--all\" as an argument");
+               return;
+          }
+          if (statement.statement.Type == StatementType.Rem)
+          {
+               Console.WriteLine("Can't place a breakpoint on a comment line");
+               return;
+          }
+          
+          await _emitter.EnsureConnected();
+          if (!_breakPoints.Add(line))
+          { _breakPoints.Remove(line); }
+          await _emitter.UpdateBreakpoint(line);
+     }
+     
+     private void HandleExit()
+     {
+          TerminateExecution();
+          Console.WriteLine("Execution terminated");
+     }
+
+     private async Task HandleUpdate()
+     {
+          await _emitter.EnsureConnected();
+          await _emitter.Print();
+     }
+
+     private void HandleMemory(ConsoleCommand command)
+     {
+          var args = command.Arguments;
+          if (args.Length == 0)
+          { PrintMemory(null); }
+          else
+          {
+               var address = args[0];
+               if (!char.TryParse(address, out var charAddress) || charAddress is < 'A' or > 'Z')
+               { Console.WriteLine("Invalid address as an argument"); }
+               else
+               { PrintMemory(charAddress); }
+          }
+     }
+
+     private async Task HandleStep(ConsoleCommand command)
+     {
+          var args = command.Arguments;
+          switch (args.Length)
+          {
+               case 0:
+               {
+                    await SingleStep(StepMode.In, false);
+                    return;
+               }
+               case 1:
+               {
+                    if (args[0] is "-f" or "--force")
+                    { await SingleStep(StepMode.In, true); }
+                    else if (Enum.TryParse<StepMode>(args[0], true, out var step))
+                    { await SingleStep(step, false); }
+                    else
+                    { Console.WriteLine("Unknown argument provided"); }
+
+                    return;
+               }
+               default:
+               {
+                    if (!Enum.TryParse<StepMode>(args[0], true, out var step))
+                    { Console.WriteLine("Expected a step mode as a valid first argument"); }
+                    else if (args[1] is not ("-f" or "--force"))
+                    { Console.WriteLine("Expected a force mode as a valid second argument"); }
+                    else
+                    { await SingleStep(step, true); }
+
+                    return;
+               }
+          }
+     }
+
      public async Task Debug()
      {
           CurrentLineIndex = 0;
@@ -215,6 +257,9 @@ public partial class DebugEnvironment : TinyBasicEnvironment
      private new async Task ExecuteDirectly(string line)
      {
           var tokens = TokenizeInput(line);
+          if (tokens is null)
+          { return; }
+          
           if (tokens.Length == 0 || tokens[0] is ServiceToken { Type: ServiceType.Newline })
           { return; }
 
@@ -298,6 +343,7 @@ public partial class DebugEnvironment : TinyBasicEnvironment
 
      private async Task InterruptExecution()
      {
+          DebuggerManual.PrintGreetings();
           while (CanRun())
           {
                var commandRequest = await _cli.RequestAndExecuteAsync();
@@ -411,7 +457,7 @@ public partial class DebugEnvironment : TinyBasicEnvironment
           }
      }
      
-     private void PrintCallStack()
+     private void HandleStack()
      {
           foreach (var callerLine in ReturnStack)
           {

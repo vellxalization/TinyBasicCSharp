@@ -11,6 +11,8 @@ public class FunctionParser
 
     public static bool IsValidFunctionName(string name) => Map.ContainsKey(name);
     
+    public static string[] GetFunctionNames() => Map.Keys.ToArray();
+    
     public static FunctionToken ParseFunction(Span<IToken> selectedTokens)
     {
         if (selectedTokens.Length < 3)

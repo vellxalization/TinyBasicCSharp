@@ -7,7 +7,6 @@ namespace TinyBasicCSharp.Environment;
 public class TinyBasicEnvironment
 {
     public ConsoleCancelEventHandler CancelHandler { get; }
-
     protected SortedList<short, (Statement statement, bool isLabeled)> Program = new();
     protected readonly EnvironmentMemory Memory = new();
     private readonly ExpressionEvaluator _evaluator;
@@ -30,12 +29,55 @@ public class TinyBasicEnvironment
         };
         _evaluator = new ExpressionEvaluator(Memory);
     }
+
+    public bool LoadFile(string[] stringLines)
+    {
+       var statements = new List<Statement>(stringLines.Length);
+       foreach (var line in stringLines)
+       {
+           var tokenized = TokenizeInput(line);
+           if (tokenized is null)
+           { return false; }
+           
+           if (tokenized.Length == 0)
+           { continue; }
+
+           try
+           {
+               var statement = Parser.ParseStatement(tokenized);
+               statements.Add(statement);
+           }
+           catch (ParsingException ex)
+           {
+               var lineNumber = tokenized[0] is NumberToken numberToken ? numberToken.Value : CurrentLineIndex;
+               Console.WriteLine($"Syntax error on line {lineNumber}");
+               ex.PrintException();
+               return false;
+           }
+       }
+
+       Clear();
+       Memory.Reset();
+       CurrentLineIndex = 1;
+       foreach (var statement in statements)
+       {
+           if (statement.Label is not null)
+           { AddLabeledStatement(statement); }
+           else
+           { AddUnlabeledStatement(statement); }
+       }
+
+       return true;
+    }
+
     
+    public string[] GetProgramAsStringArray() => Program.Select(pair => pair.Value.statement.ToString()).ToArray();
+
     /// <summary>
     /// Creates a debugging environment from this instance of environment
     /// </summary>
     /// <returns></returns>
-    public DebugEnvironment CreateDebugEnvironment() => new(Program); 
+    public DebugEnvironment CreateDebugEnvironment() => new(Program);
     
     /// <summary>
     /// Method for executing single isolated line of TinyBasic code. If it's not labeled - it will be executed immediately.
@@ -45,6 +87,9 @@ public class TinyBasicEnvironment
     public void ExecuteDirectly(string line)
     {
         var tokens = TokenizeInput(line);
+        if (tokens is null)
+        { return; }
+        
         if (tokens.Length == 0 || tokens[0] is ServiceToken { Type: ServiceType.Newline })
         { return; }
 
@@ -85,30 +130,49 @@ public class TinyBasicEnvironment
         }
     }
     
-    protected IToken[] TokenizeInput(string input)
+    protected IToken[]? TokenizeInput(string input)
     {
         try
         { return Lexer.Tokenize(input); }
         catch (TokenizationException ex)
         {
             ex.PrintException();
-            return [];
+            return null;
         }
     }
 
-    protected virtual void UpdateProgram(Statement statement)
+    protected void UpdateProgram(Statement statement)
     {
         var label = statement.Label;
-        if (label == null)
-        { throw new ArgumentException("Can't add statement without a label"); }
-
-        if (statement.Type is StatementType.Newline)
-        { Program.Remove(label.Value); }
-        else
+        if (label is null)
         {
-            if (!Program.TryAdd(label.Value, (statement, true)))
-            { Program[label.Value] = (statement, true); }
+            if (statement.Arguments.Length == 0 || statement.Arguments[0] is ServiceToken { Type: ServiceType.Newline })
+            { return; }
+            
+            AddUnlabeledStatement(statement);
         }
+        
+        AddLabeledStatement(statement);
+    }
+
+    private void AddUnlabeledStatement(Statement statement)
+    {
+        Program.Add(CurrentLineIndex, (statement, false));
+        ++CurrentLineIndex;
+    }
+
+    private void AddLabeledStatement(Statement statement)
+    {
+        var label = statement.Label!.Value;
+        if (statement.Arguments.Length == 0 || statement.Arguments[0] is ServiceToken { Type: ServiceType.Newline })
+        {
+            Program.Remove(label);
+            return;
+        }
+        
+        Program[label] = (statement, true);
+        if (label >= CurrentLineIndex)
+        { CurrentLineIndex = (short)(label + 1); }
     }
     
     protected void ExecuteStatement(Statement statement)
@@ -226,6 +290,7 @@ public class TinyBasicEnvironment
 
     protected void Clear()
     {
+        CurrentLineIndex = 0;
         TerminateExecution();
         _inputQueue.Clear();
         ReturnStack.Clear();
@@ -258,8 +323,12 @@ public class TinyBasicEnvironment
     
     private void PrintProgram()
     {
-        foreach (var (statement, _) in Program.Values)
-        { Console.WriteLine(statement); }
+        foreach (var (label, statement) in Program)
+        {
+            if (!statement.isLabeled)
+            { Console.Write($"({label}) "); }
+            Console.WriteLine(statement.statement.ToString());
+        }
     }
 
     private void GoToLabel(IToken[] arguments, bool isSubroutine)
@@ -335,7 +404,7 @@ public class TinyBasicEnvironment
         { return []; }
 
         var tokens = TokenizeInput(input);
-        if (tokens.Length == 0) 
+        if (tokens is null || tokens.Length == 0) 
         { return []; }
 
         try

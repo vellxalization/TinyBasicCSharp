@@ -1,15 +1,17 @@
-﻿using TinyCompilerForTinyBasic.Environment;
+﻿using TinyBasicCSharp.Environment;
 
-namespace TinyCompilerForTinyBasic;
+namespace TinyBasicCSharp;
 
 /// <summary>
 /// Main class for interacting with user
 /// </summary>
-public class ConsoleApplication
+public partial class ConsoleApplication
 {
     private TinyBasicEnvironment _environment = new();
     private ConsoleInterface _cli;
     private bool _isRunning = false;
+    private string _lastUsedPath = "";
+    
     public ConsoleApplication()
     {
         _cli = new ConsoleInterface()
@@ -22,45 +24,11 @@ public class ConsoleApplication
 
     private void RegisterCommands()
     {
-        _cli.RegisterCommand("help", (command) => PrintHelp(command.Arguments));
-        _cli.RegisterCommand("execute", (command) => ExecuteFile(command.Arguments));
-        _cli.RegisterCommand("debug", async (command) => await Debug(command.Arguments));
-        _cli.RegisterCommand("exit", (_) => _environment.TerminateExecution());
-    }
-    
-    private void ExecuteFile(string[] args)
-    {
-        var env = CreateFileEnvironment(args[0]);
-        env?.ExecuteLoadedFile();
-    }
-
-    private FileEnvironment? CreateFileEnvironment(string path)
-    {
-        if (string.IsNullOrEmpty(path))
-        { throw new ArgumentException("No path to file were provided"); }
-
-        var stringPath = path.Trim('"');
-        if (!stringPath.EndsWith(".bas"))
-        {
-            Console.WriteLine("File should be in .bas format");
-            return null;
-        }
-        
-        string file;
-        try
-        { file = File.ReadAllText(stringPath); }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-            return null;
-        }
-        
-        var fileEnvironment = new FileEnvironment();
-        if (!fileEnvironment.LoadFile(file))
-        { return null; }
-        
-        Console.CancelKeyPress += fileEnvironment.CancelHandler;
-        return fileEnvironment;
+        _cli.RegisterCommand("help", (command) => HandleHelp(command.Arguments));
+        _cli.RegisterCommand("save", (command) => HandleSave(command.Arguments));
+        _cli.RegisterCommand("load", (command) => HandleLoad(command.Arguments));
+        _cli.RegisterCommand("debug", async (command) => await HandleDebug(command.Arguments));
+        _cli.RegisterCommand("exit", _ => HandleExit());
     }
     
     /// <summary>
@@ -68,252 +36,213 @@ public class ConsoleApplication
     /// </summary>
     public async Task Run()
     {
-        Manual.PrintGreetings();
+        TinyBasicManual.PrintGreetings();
         _isRunning = true;
         while (_isRunning)
         {
             var commandRequest = await _cli.RequestAndExecuteAsync();
             if (commandRequest.executed)
             { continue; }
-            if (commandRequest.command == null)
+            if (commandRequest.command is null)
             { continue; }
             _environment.ExecuteDirectly(string.Join(' ', commandRequest.command.Signature,
                 string.Join(' ', commandRequest.command.Arguments)));
         }
     }
 
-    private Task Debug(string[] args)
+    /// <summary>
+    /// Handles 'exit' command
+    /// </summary>
+    private void HandleExit()
     {
-        var debugEnvironment = args.Length > 0 ? CreateFileEnvironment(args[0])?.CreateDebugEnvironment() : _environment.CreateDebugEnvironment();
-        if (debugEnvironment == null)
+        _isRunning = false;
+        _environment.TerminateExecution();
+    }
+    
+    /// <summary>
+    /// Handles 'load' command
+    /// </summary>
+    /// <param name="args">Additional arguments</param>
+    private void HandleLoad(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.WriteLine("Please specify a path to a *.bas file.");
+            return;
+        }
+        
+        var path = args[0];
+        path = path.Trim('"');
+        if (!FileManager.IsValidBasPath(path))
+        {
+            Console.WriteLine("Invalid path *.bas path");
+            return;
+        }
+
+        if (OpenFile(path))
+        {
+            _lastUsedPath = path;
+            Console.WriteLine($"Loaded {_environment.GetProgramAsStringArray().Length} lines");
+        }
+    }
+    
+    
+    private bool OpenFile(string path)
+    {
+        if (_environment.GetProgramAsStringArray().Length == 0)
+        { return Load(); }
+        
+        Console.WriteLine("Do you want to save current program? (y)es or (n)o");
+        if (!ConsoleInterface.RequestConfirmation())
+        { return Load(); }
+        
+        var linesToSave = _environment.GetProgramAsStringArray();
+        string savePath;
+        do
+        {
+            Console.WriteLine("Provide a *.bas path to save the program");
+            savePath = Console.ReadLine()?.Trim('"') ?? "";
+            while (!FileManager.IsValidBasPath(savePath))
+            {
+                Console.WriteLine("Invalid *.bas path");
+                savePath = Console.ReadLine()?.Trim('"') ?? "";
+            }
+        } while (FileManager.SaveTo(linesToSave, savePath) != FileManager.SaveStatus.Success);
+
+        return Load();
+
+        bool Load()
+        {
+            var newProgram = FileManager.ReadFile(path);
+            if (newProgram is not null) 
+            { return _environment.LoadFile(newProgram); }
+            
+            Console.WriteLine($"File {path} does not exist");
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// Handles 'save' command
+    /// </summary>
+    /// <param name="args">Additional arguments</param>
+    private void HandleSave(string[] args)
+    {
+        bool overWrite, useLastPath;
+        if (args.Length == 0)
+        {
+            useLastPath = true;
+            overWrite = false;
+        }
+        else if (args.Length == 1)
+        { useLastPath = overWrite = args[0] is "-o" or "--overwrite"; }
+        else
+        {
+            if (args[1] is not ("-o" or "--overwrite"))
+            {
+                Console.WriteLine("Expected overwrite flag as a second argument"); 
+                return;
+            }
+            overWrite = true;
+            useLastPath = false;
+        }
+
+        if (useLastPath && _lastUsedPath == "")
+        {
+            Console.WriteLine("Please specify a *.bas path");
+            return;
+        }
+
+        var path = useLastPath ? _lastUsedPath : args[0].Trim('"');
+        if (!FileManager.IsValidBasPath(path))
+        {
+            Console.WriteLine("Invalid path *.bas path");
+            return;
+        }
+        
+        var lines = _environment.GetProgramAsStringArray();
+        if (FileManager.SaveTo(lines, path, overWrite) == FileManager.SaveStatus.Success)
+        { _lastUsedPath = path; }
+    }
+    
+    /// <summary>
+    /// Handles 'debug' command
+    /// </summary>
+    /// <param name="args">Additional arguments</param>
+    /// <returns></returns>
+    private Task HandleDebug(string[] args)
+    {
+        DebugEnvironment? debugEnvironment = args.Length == 0 ? _environment.CreateDebugEnvironment() : OpenFile(args[0]) 
+            ? _environment.CreateDebugEnvironment() : null;
+        if (debugEnvironment is null)
         { return Task.CompletedTask; }
         
-        
-        Console.CancelKeyPress += debugEnvironment.CancelHandler;
+        Console.CancelKeyPress += _environment.CancelHandler;
         return debugEnvironment.Debug();
     }
     
     /// <summary>
     /// Handles 'help' command
     /// </summary>
-    /// <param name="commands">User input separated by space</param>
-    private void PrintHelp(string[] commands)
+    /// <param name="commands">Additional arguments</param>
+    private void HandleHelp(string[] commands)
     {
         if (commands.Length < 1 || string.IsNullOrEmpty(commands[0]))
         {
-            Manual.PrintHelp();
+            TinyBasicManual.PrintHelp();
             return;
         }
 
         switch (commands[0])
         {
-            case "execute":
-                Manual.PrintHelpExecute();
+            case "load":
+                TinyBasicManual.PrintLoad();
+                return;
+            case "save":
+                TinyBasicManual.PrintSave();
                 return;
             case "PRINT":
-                Manual.PrintHelpPrint();
+                TinyBasicManual.PrintPrint();
                 return;
             case "INPUT":
-                Manual.PrintHelpInput();
+                TinyBasicManual.PrintInput();
                 return;
             case "LET":
-                Manual.PrintHelpLet();
+                TinyBasicManual.PrintLet();
                 return;
             case "GOTO":
-                Manual.PrintHelpGoto();
+                TinyBasicManual.PrintGoto();
                 return;
             case "GOSUB":
-                Manual.PrintHelpGosub();
+                TinyBasicManual.PrintGosub();
                 return;
             case "IF":
-                Manual.PrintHelpIf();
+                TinyBasicManual.PrintIf();
                 return;
             case "RETURN":
-                Manual.PrintHelpReturn();
+                TinyBasicManual.PrintReturn();
                 return;
             case "CLEAR":
-                Manual.PrintHelpClear();
+                TinyBasicManual.PrintClear();
                 return;
             case "LIST":
-                Manual.PrintHelpList();
+                TinyBasicManual.PrintList();
                 return;
             case "RUN":
-                Manual.PrintHelpRun();
+                TinyBasicManual.PrintRun();
                 return;
             case "END":
-                Manual.PrintHelpEnd();
+                TinyBasicManual.PrintEnd();
+                return;
+            case "RND":
+                TinyBasicManual.PrintRnd();
+                return;
+            case "REM":
+                TinyBasicManual.PrintRem();
                 return;
             default:
                 Console.WriteLine("Unknown argument for help");
                 return;
-        }
-    }
-    
-    /// <summary>
-    /// Class for printing all possible help messages
-    /// </summary>
-    private static class Manual
-    {
-        public static void PrintGreetings()
-        {
-            string message = "This is a compiler for TinyBasic. Type 'help' to get started.";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelp()
-        {
-            string message =
-                "Type 'exit' to close this window.\n" +
-                "Type 'help' to display this message.\n" +
-                "Type 'help [<statement>]'to see instructions for provided statement\n" +
-                "Type 'execute <path>.bas' to execute .bas TinyBasic file.\n" +
-                "This behaves slightly different than entered into the terminal code — type 'help execute' to learn more.\n" +
-                "Type '[<lineNumber>] <statement> [<arguments>]' to execute TinyBasic code.\n" +
-                "Currently this compiler supports 11 statements: IF, GOTO, GOSUB, INPUT, LET, RETURN, CLEAR, LIST, RUN, END.\n" +
-                "You can either type them directly (e.g. PRINT \"HELLO WORLD\") and get immediate response or you can add a label from 1 to 32767 inclusively (e.g. 1 PRINT \"HELLO WORLD\") to write line into the memory and execute it later as a part of program.";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpExecute()
-        {
-            string message = "execute <path>.bas\n" +
-                             "* <path>.bas - path to TinyBasic .bas file.\n" +
-                             "Reads entire file line-by-line and executes it. This will create a separate temporary environment with it's own variables and execute code there.\n" +
-                             "If you're writing your TinyBasic code in a file, this compiler allows you to not every line and will do auto-increment the last line number unless the line already contains a label. For example, the following code in a file:\n\n" +
-                             "1 PRINT \"HELLO WORLD!\"\n" +
-                             "LET X = 10\n" +
-                             "10 PRINT \"10TH LINE\"\n" +
-                             "11 LET Y = 11\n" +
-                             "LET Z = 12\n\n" +
-                             "will automatically translate to\n\n" +
-                             "1 PRINT \"HELLO WORLD!\"\n" +
-                             "2 LET X = 10\n" +
-                             "10 PRINT \"10TH LINE\"\n" +
-                             "11 LET Y = 11\n12 LET Z = 12\n\n" +
-                             "However, auto-generated labels such as 2 and 12 from the example are not allowed to be jumped to by GOTO or GOSUB statements, to avoid unexpected behavior. You should only be able to jump to user-defined labels.\n" +
-                             "However, auto-generated labels WILL be overwritten if the file contains the same user-defined label. For example, the following code in a file\n\n" +
-                             "PRINT \"HELLO WORLD!\"\n" +
-                             "LET X = 10\n" +
-                             "LET Y = 11\n" +
-                             "2 LET Z = 12\n\n" +
-                             "will be translated to:\n\n" +
-                             "1 PRINT \"HELLO WORLD!\"\n" +
-                             "2 LET Z = 12\n" +
-                             "3 LET Y = 11\n\n" +
-                             "Note that line 'LET X = 10' is overwritten by '2 LET Z = 12' and thus completely absent.";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpPrint()
-        {
-            string message = "PRINT {<\"string\"> | <expression>} [, {<\"string\"> | <expression>} ...]\n" +
-                             "* <\"string\"> - any quoted string (e.g. \"Hello World!\")\n" +
-                             "* <expression> - can be a number, a variable name or an expression containing numbers, operators and variables;\n" +
-                             "Outputs provided arguments in the console. Use commas to separate multiple arguments.\n\n" +
-                             "Examples:\n" +
-                             "* PRINT \"HELLO WORLD!\" // \"HELLO WORLD\";\n" +
-                             "* PRINT 10 // \"10\";\n" +
-                             "* PRINT X, \" degrees Celsius is \", (X * 9 / 5) + 32, \" degrees Fahrenheit // with X = 100: \"100 degrees Celsius is 212 degrees Fahrenheit\".";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpInput()
-        {
-            string message = "INPUT {A | B |... Z} [, {A | B |... Z} ...]\n" +
-                             "* {A | B |... Z} - variable name (TinyBasic supports variable names from A to Z).\n" +
-                             "Requests a set of expressions from the user to be written into the corresponding variables. Providing fewer expressions than variables will result in another request until all variables aren't filled with values.\n" +
-                             "On the other hand, providing more expressions will result in queuing expressions. Queued expressions are used in subsequent INPUT calls (e.g. calling \"INPUT X, Y\" and providing input \"1, 2, 3\" will result in queuing 3.\n" +
-                             "Subsequent call of \"INPUT Z\" will cause 3 to be taken from the queue without requesting any input from the user).\n\n" +
-                             "Examples:\n" +
-                             "* INPUT X;\n" +
-                             "* INPUT X, Y, Z.\n\n" +
-                             "Possible user input may include:\n" +
-                             "* Numbers;\n" +
-                             "* Other variables;\n" +
-                             "* Expressions containing numbers, operators and variables (1 + X; 1 * (S + 3)).";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpLet()
-        {
-            string message = "LET {A | B | ... Z} = <expression>\n" +
-                             "* {A | B |... Z} - variable name (TinyBasic supports variable names from A to Z);\n" +
-                             "* <expression> - single number, variable or a complex expression containing numbers, operators and variables.\n" +
-                             "Evaluates expression and writes the result into provided variable.\n\n" +
-                             "Examples:\n" +
-                             "* LET X = 10;\n" +
-                             "* LET Y = X;\n" +
-                             "* LET Z = X * (250 + Y).";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpGoto()
-        {
-            string message = "GOTO <expression>\n" +
-                             "* <expression> - single number, variable or a complex expression containing numbers, operators and variables.\n" +
-                             "Evaluates expression and moves pointer to the value. Examples:\n" +
-                             "* GOTO 20;\n" +
-                             "* GOTO X;\n" +
-                             "* GOTO 20 + X;";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpGosub()
-        {
-            string message = "GOSUB <expression>\n" +
-                             "* <expression> - Expression containing a singular number, variable or a complex expression, containing numbers, operators and variables.\n" +
-                             "Evaluates expression and moves pointer to the value.\n" +
-                             "Unlike GOTO, it remembers the line from which it was called, so you can RETURN and continue execution later. This allows you to create subroutines.\n\n" +
-                             "Examples:\n" +
-                             "* GOSUB 20;\n" +
-                             "* GOSUB X;\n" +
-                             "* GOSUB 20 + X;";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpIf()
-        {
-            string message =
-                "IF <expression1> { < | > | <= | >= | = | {<> | ><} } <expression2> THEN <statement>\n" +
-                "* <expression> - single number, variable or a complex expression containing numbers, operators and variables;\n" +
-                "* <statement> - statement to execute if the condition is true.\n" +
-                "Checks whether the condition is true, and if so, executes the next statement.\n\n" +
-                "Examples:\n" +
-                "* IF 1 = 10 THEN PRINT \"TRUE\" // won't result in any execution;\n" +
-                "* IF X < (10 * Y) THEN INPUT X;\n" +
-                "* IF X <> (10 * Y) THEN IF X >< (20 * Y) THEN GOTO 100; // you can chain IF statements like that.\n" +
-                "// You can also use both <> and >< to check that expression 1 is not equal to expression 2.";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpReturn()
-        {
-            string message = "Moves pointer position to the last unreturned call of GOSUB.";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpClear()
-        {
-            string message = "Removes all lines from the environment's memory.";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpList()
-        {
-            string message = "Lists all lines containing in environment's memory.";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpRun()
-        {
-            string message = "Executes all lines in the environment's memory, starting with the smallest label.";
-            Console.WriteLine(message);
-        }
-
-        public static void PrintHelpEnd()
-        {
-            string message = "Terminates execution of the program. Can be used for premature termination. All programs include this command.";
-            Console.WriteLine(message);
         }
     }
 }
