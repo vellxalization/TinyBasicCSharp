@@ -3,8 +3,16 @@ using TinyBasicCSharp.Tokenization;
 
 namespace TinyBasicCSharp.Parsing;
 
+/// <summary>
+/// An abstract statement parser
+/// </summary>
 public interface IStatementParser
 {
+    /// <summary>
+    /// Tries to parse a statement
+    /// </summary>
+    /// <param name="line">Span of tokens</param>
+    /// <returns>Statement if parsing is successful</returns>
     public Statement Parse(Span<IToken> line);
 }
 

@@ -3,6 +3,9 @@ using TinyBasicCSharp.Tokenization;
 
 namespace TinyBasicCSharp.Environment;
 
+/// <summary>
+/// An environment to debug TinyBasic code
+/// </summary>
 public partial class DebugEnvironment : TinyBasicEnvironment
 {
      private readonly HashSet<short> _breakPoints = [];
@@ -214,6 +217,9 @@ public partial class DebugEnvironment : TinyBasicEnvironment
           }
      }
 
+     /// <summary>
+     /// Starts the debugger.
+     /// </summary>
      public async Task Debug()
      {
           CurrentLineIndex = 0;

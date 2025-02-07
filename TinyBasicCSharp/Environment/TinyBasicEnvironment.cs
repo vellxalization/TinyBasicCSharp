@@ -4,6 +4,9 @@ using TinyBasicCSharp.Tokenization;
 
 namespace TinyBasicCSharp.Environment;
 
+/// <summary>
+/// An environment to execute TinyBasic code
+/// </summary>
 public class TinyBasicEnvironment
 {
     public ConsoleCancelEventHandler CancelHandler { get; }

@@ -2,10 +2,18 @@ using TinyBasicCSharp.Tokenization;
 
 namespace TinyBasicCSharp.Parsing;
 
+/// <summary>
+/// A class for parsing statements
+/// </summary>
 public static class Parser
 {
     private static Lazy<Dictionary<string, IStatementParser>> _map = new(CreateMap);
     
+    /// <summary>
+    /// Tries to parse a statement
+    /// </summary>
+    /// <param name="singleLine">Span of tokens</param>
+    /// <returns>Statement token if parsing is successful</returns>
     public static Statement ParseStatement(Span<IToken> singleLine)
     {
         if (singleLine.Length == 0 || singleLine[0] is ServiceToken { Type: ServiceType.Newline })
@@ -61,6 +69,11 @@ public static class Parser
         return map;
     }
     
+    /// <summary>
+    /// Splits an array of tokens by the newline token
+    /// </summary>
+    /// <param name="tokens">Array of tokens</param>
+    /// <returns>Array of tokens array</returns>
     public static IToken[][] SplitByNewline(IToken[] tokens)
     {
         var anchor = 0;
@@ -79,5 +92,9 @@ public static class Parser
         return lines.ToArray();
     }
     
+    /// <summary>
+    /// Returns all valid statements
+    /// </summary>
+    /// <returns>An array of statements</returns>
     public static string[] GetAllStatements() => _map.Value.Keys.ToArray();
 }

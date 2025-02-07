@@ -2,8 +2,17 @@ using TinyBasicCSharp.Tokenization;
 
 namespace TinyBasicCSharp.Parsing;
 
+/// <summary>
+/// An abstract function parser
+/// </summary>
 public interface IFunctionParser
 {
+    /// <summary>
+    /// Tries to parse a function and it's arguments
+    /// </summary>
+    /// <param name="signature">Function name</param>
+    /// <param name="arguments">Function arguments</param>
+    /// <returns>Function token if parsing is successful</returns>
     public FunctionToken Parse(string signature, IToken[][] arguments);
 }
 

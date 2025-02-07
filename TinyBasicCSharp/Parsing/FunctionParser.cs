@@ -2,17 +2,34 @@ using TinyBasicCSharp.Tokenization;
 
 namespace TinyBasicCSharp.Parsing;
 
+/// <summary>
+/// Class for parsing functions
+/// </summary>
 public class FunctionParser
 {
     private static readonly Dictionary<string, IFunctionParser> Map = new()
     {
         { "RND", new RandomParser() }
     };
-
+    
+    /// <summary>
+    /// Checks if a function with provided name exists
+    /// </summary>
+    /// <param name="name">String to check</param>
+    /// <returns>true if the function exists, false otherwise</returns>
     public static bool IsValidFunctionName(string name) => Map.ContainsKey(name);
     
+    /// <summary>
+    /// Returns all the function names.
+    /// </summary>
+    /// <returns>Array of function names.</returns>
     public static string[] GetFunctionNames() => Map.Keys.ToArray();
     
+    /// <summary>
+    /// Parses a span of tokens into a function token
+    /// </summary>
+    /// <param name="selectedTokens">Span of tokens</param>
+    /// <returns>Function token if parsing is successful</returns>
     public static FunctionToken ParseFunction(Span<IToken> selectedTokens)
     {
         if (selectedTokens.Length < 3)
@@ -63,6 +80,12 @@ public class FunctionParser
         return arguments.ToArray();
     }
     
+    /// <summary>
+    /// Selects a function tokens by matching a function name and everything inside parentheses
+    /// </summary>
+    /// <param name="tokens">Span of tokens</param>
+    /// <param name="startFrom">Pointer from where function will try to match tokens</param>
+    /// <returns>Span of tokens</returns>
     public static Span<IToken> SelectFunctionTokens(Span<IToken> tokens, int startFrom)
     {
         if (tokens[startFrom] is not WordToken signature || !IsValidFunctionName(signature.Value))

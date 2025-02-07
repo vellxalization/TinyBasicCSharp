@@ -4,6 +4,9 @@ using TinyBasicCSharp.Tokenization;
 
 namespace TinyBasicCSharp.Environment;
 
+/// <summary>
+/// Class for sending information to the console process of debugger.
+/// </summary>
 public class PipeEmitter
 {
     private Process? _process;
@@ -21,6 +24,9 @@ public class PipeEmitter
         _breakpoints = breakpoints;
     }
 
+    /// <summary>
+    /// Checks if the connection exists, and if it doesn't - restarts it
+    /// </summary>
     public async Task EnsureConnected()
     {
         if (_process is { HasExited: false } && _stream is { IsConnected: true })
@@ -71,12 +77,22 @@ public class PipeEmitter
         await UpdateCurrentLine(_currentLine);
     }
     
+    /// <summary>
+    /// Sends a signal to the console process to update an existing line with the new statement
+    /// </summary>
+    /// <param name="statement">New statement to replace old one</param>
+    /// <param name="index">Old statement index</param>
     public async Task UpdateLine(Statement statement, short index)
     {
         var stringToSend = $"u:{index}:{statement}";
         await _writer!.WriteLineAsync(stringToSend);
     }
 
+    /// <summary>
+    /// Sends a signal to the console process to append a new statement
+    /// </summary>
+    /// <param name="statement">New statement</param>
+    /// <param name="label">New statement label</param>
     public async Task AddLine(Statement statement, short label)
     {
         var stringToSend = $"a:{label}:{statement}";
@@ -85,21 +101,36 @@ public class PipeEmitter
 
     private async Task AddLine(string line, short label) => await _writer!.WriteLineAsync($"a:{label}:{line}");
     
+    /// <summary>
+    /// Sends a signal to the console process to remove a line
+    /// </summary>
+    /// <param name="index">Index of the statement to be removed</param>
     public async Task RemoveLine(short index)
     {
         var stringToSend = $"r:{index}";
         await _writer!.WriteLineAsync(stringToSend);
     }
 
+    /// <summary>
+    /// Sends a signal to the console process to clear the console and print current state.
+    /// </summary>
     public async Task Print()
     { await _writer!.WriteLineAsync("print"); }
 
+    /// <summary>
+    /// Sends a signal to the console process to place/remove a breakpoint
+    /// </summary>
+    /// <param name="breakpoint">Line number</param>
     public async Task UpdateBreakpoint(short breakpoint)
     {
         var stringToSend = $"b:{breakpoint}";
         await _writer!.WriteLineAsync(stringToSend);
     }
 
+    /// <summary>
+    /// Sends a signal to the console process to update the cursor
+    /// </summary>
+    /// <param name="currentLine"></param>
     public async Task UpdateCurrentLine(short currentLine)
     {
         _currentLine = currentLine;
@@ -107,6 +138,9 @@ public class PipeEmitter
         await _writer!.WriteLineAsync(stringToSend);
     }
     
+    /// <summary>
+    /// Closes the pipe connection and kills the console process.
+    /// </summary>
     public async Task Close()
     {
         if (_stream != null)

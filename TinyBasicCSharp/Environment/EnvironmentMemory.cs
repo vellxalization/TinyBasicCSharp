@@ -35,5 +35,8 @@ public class EnvironmentMemory
         return _memory[address - 'A'];
     }
 
+    /// <summary>
+    /// Resets all variables to 'uninitialized' (null)
+    /// </summary>
     public void Reset() => _memory = new short?[26];
 }

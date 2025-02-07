@@ -8,7 +8,7 @@ public class ExpressionParser
     /// <summary>
     /// Matches all possible expression tokens (operators, variables, numbers, function calls) and returns span of them.
     /// </summary>
-    /// <param name="line">Array of tokens</param>
+    /// <param name="line">Span of tokens</param>
     /// <param name="start">int pointer from where method will try to select the expression. </param>
     /// <returns>Span of the original array</returns>
     public static Span<IToken> SelectExpressionFromLine(Span<IToken> line, int start)
@@ -47,6 +47,11 @@ public class ExpressionParser
         return line.Slice(start, pointerCopy - start);
     }
     
+    /// <summary>
+    /// Parses a span of tokens into an expression
+    /// </summary>
+    /// <param name="selectedTokens">Span of tokens</param>
+    /// <returns>Expression token if parsing is successful</returns>
     public static ExpressionToken ParseExpression(Span<IToken> selectedTokens)
     {
         if (selectedTokens.Length is 0)
